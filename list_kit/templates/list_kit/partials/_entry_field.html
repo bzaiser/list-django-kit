@@ -1,0 +1,29 @@
+{% if field_key == 'use_notes' and entry.notes %}
+    <span class="small text-muted text-break">{{ entry.notes|truncatechars:140 }}</span>
+{% elif field_key == 'use_location' and template.use_location and entry.location %}
+    <span class="badge bg-body-secondary text-body border"><i class="bi bi-geo-alt me-1"></i>{{ entry.location }}</span>
+{% elif field_key == 'use_start_date' and template.use_start_date and entry.start_date %}
+    <span class="badge text-bg-secondary"><i class="bi bi-calendar-event me-1"></i>{{ entry.start_date|date:"d.m.Y H:i" }}</span>
+{% elif field_key == 'use_end_date' and template.use_end_date and entry.end_date %}
+    <span class="badge text-bg-secondary"><i class="bi bi-flag me-1"></i>{{ entry.end_date|date:"d.m.Y H:i" }}</span>
+{% elif field_key == 'use_reminder' and template.use_reminder and entry.reminder_at %}
+    <span class="badge text-bg-warning"><i class="bi bi-alarm me-1"></i>{{ entry.reminder_at|date:"d.m.Y H:i" }}</span>
+{% elif field_key == 'use_amount' and template.use_amount and entry.amount_value is not None %}
+    <span class="badge text-bg-secondary">{{ entry.amount_value|floatformat:"-2" }}{% if entry.amount_unit %} {{ entry.amount_unit }}{% endif %}</span>
+{% elif field_key == 'use_price' and template.use_price and entry.price is not None %}
+    <span class="badge bg-body-secondary text-body border">{{ entry.price }} €</span>
+{% elif field_key == 'use_rating' and template.use_rating and entry.rating %}
+    <span class="badge text-bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>{{ entry.rating }}/5</span>
+{% elif field_key == 'use_url' and template.use_url and entry.url %}
+    <a href="{{ entry.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2"><i class="bi bi-box-arrow-up-right me-1"></i>Link</a>
+{% elif field_key == 'use_image' and template.use_image and entry.image_url %}
+    <a href="{{ entry.image_url }}" target="_blank"><img src="{{ entry.image_url }}" alt="{{ entry.title }}" class="img-thumbnail rounded-2" width="64"></a>
+{% else %}
+    {% for cf in custom_display %}
+        {% with cf_id="cf:"|add:cf.key %}
+        {% if cf_id == field_key and cf.show_on_card %}
+            <span class="badge bg-body-secondary text-body border">{{ cf.label }}: <strong>{{ cf.value }}</strong></span>
+        {% endif %}
+        {% endwith %}
+    {% endfor %}
+{% endif %}

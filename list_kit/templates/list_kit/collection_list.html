@@ -1,0 +1,51 @@
+{% extends "design_studio/layouts/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Listen & Sammlungen" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1"><i class="bi bi-card-checklist me-2 text-primary"></i>{% trans "Listen & Sammlungen" %}</h1>
+        <p class="text-muted small mb-0">{% trans "Dynamische Listen, News-Beiträge, FAQs und Formular-Eingänge." %}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if request.user.is_staff %}
+        <a href="{% url 'list_kit:builder_list' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+            <i class="bi bi-ui-checks-grid me-1"></i>{% trans "Template-Builder" %}
+        </a>
+        {% endif %}
+        <a href="{% url 'list_kit:collection_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+            <i class="bi bi-plus-circle me-1"></i>{% trans "Neue Sammlung" %}
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    {% for col in collections %}
+    <div class="col-12 col-sm-6 col-lg-4">
+        <a href="{% url 'list_kit:collection_detail' col.id %}" class="card metric-card h-100 text-decoration-none text-reset shadow-sm">
+            <div class="kpi-spotlight"></div>
+            <div class="card-body p-3 d-flex justify-content-between align-items-center gap-2">
+                <div class="min-w-0">
+                    <div class="fw-bold text-truncate">
+                        <i class="bi {{ col.template.icon|default:'bi-card-checklist' }} text-primary me-1"></i>{{ col.title }}
+                    </div>
+                    <div class="small text-muted">{{ col.template.name }} · {{ col.template.get_content_type_display }}</div>
+                </div>
+                <span class="badge text-bg-secondary flex-shrink-0">{{ col.open_count }} / {{ col.done_count }}</span>
+            </div>
+        </a>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card shadow-sm p-4 text-center text-muted">
+            {% trans "Noch keine Sammlungen vorhanden." %}
+            <div class="mt-2">
+                <a href="{% url 'list_kit:collection_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">{% trans "Erste Sammlung anlegen" %}</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

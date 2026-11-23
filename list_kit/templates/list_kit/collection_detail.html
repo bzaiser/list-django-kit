@@ -1,0 +1,202 @@
+{% extends "design_studio/layouts/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ collection.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <div class="small text-muted">
+            <a href="{% url 'list_kit:collection_list' %}" class="text-decoration-none">{% trans "Listen" %}</a> / {{ template.name }}
+        </div>
+        <h1 class="h3 fw-bold mb-0"><i class="bi {{ template.icon|default:'bi-card-checklist' }} text-primary me-2"></i>{{ collection.title }}</h1>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if can_edit %}
+        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#newEntryModal">
+            <i class="bi bi-plus-circle me-1"></i>{% trans "Neuer Eintrag" %}
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="{% if ui.layout_mode == 'cards' %}row g-3{% else %}d-flex flex-column gap-2{% endif %}">
+    {% for entry in active_entries %}
+    {% with custom_display=entry.get_custom_field_display %}
+    <div class="{% if ui.layout_mode == 'cards' %}{% if ui.card_width == '1/4' %}col-12 col-sm-6 col-lg-3{% elif ui.card_width == '1/2' %}col-12 col-sm-6{% elif ui.card_width == '3/4' %}col-12 col-lg-9{% elif ui.card_width == 'hero' %}col-12{% else %}col-12 col-md-6 col-xl-4{% endif %}{% endif %}">
+        <div class="card shadow-sm h-100">
+            <div class="card-body {% if ui.density == 'compact' %}p-2{% else %}p-3{% endif %} d-flex flex-column justify-content-between gap-2">
+                <div class="d-flex align-items-start gap-2">
+                    {% if can_edit %}
+                    <form method="post" action="{% url 'list_kit:entry_toggle' collection.id entry.id %}" class="mt-1">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-secondary p-0 px-1" title="Status umschalten">
+                            <i class="bi {% if entry.is_completed %}bi-check-square{% else %}bi-square{% endif %}"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                    <div class="flex-grow-1 min-w-0">
+                        {% if ui.card_layout %}
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <strong class="text-break">{{ entry.title }}</strong>
+                                {% if template.use_status %}<span class="badge text-bg-info">{{ entry.status }}</span>{% endif %}
+                                {% for fk in ui.card_layout.header %}
+                                    {% include "list_kit/partials/_entry_field.html" with field_key=fk %}
+                                {% endfor %}
+                            </div>
+                            {% if ui.card_layout.body %}
+                            <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                                {% for fk in ui.card_layout.body %}
+                                    {% include "list_kit/partials/_entry_field.html" with field_key=fk %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <strong class="text-break">{{ entry.title }}</strong>
+                                {% if template.use_status %}<span class="badge text-bg-info">{{ entry.status }}</span>{% endif %}
+                                <span class="badge bg-body-secondary text-body border">{{ entry.get_visibility_display }}</span>
+                            </div>
+                            {% if entry.notes %}<p class="small text-muted mb-0 mt-1 text-break">{{ entry.notes|truncatechars:140 }}</p>{% endif %}
+                            {% if custom_display %}
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                {% for cf in custom_display %}
+                                    {% if cf.show_on_card %}
+                                    <span class="badge bg-body-secondary text-body border">{{ cf.label }}: <strong>{{ cf.value }}</strong></span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between gap-2 border-top pt-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        {% if ui.card_layout %}
+                            {% for fk in ui.card_layout.footer %}
+                                {% include "list_kit/partials/_entry_field.html" with field_key=fk %}
+                            {% endfor %}
+                        {% else %}
+                            {% if template.use_price and entry.price %}<span class="badge bg-body-secondary text-body border">{{ entry.price }} €</span>{% endif %}
+                            {% if template.use_amount and entry.amount_value is not None %}<span class="badge text-bg-secondary">{{ entry.amount_value|floatformat:"-2" }} {{ entry.amount_unit }}</span>{% endif %}
+                        {% endif %}
+                    </div>
+                    {% if can_edit %}
+                    <form method="post" action="{% url 'list_kit:entry_delete' collection.id entry.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Löschen"><i class="bi bi-trash3"></i></button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="col-12">
+        <div class="card shadow-sm p-4 text-center text-muted">{% trans "Noch keine Einträge vorhanden." %}</div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if completed_entries %}
+<div class="mt-4">
+    <h2 class="h6 text-muted fw-bold mb-2">{% trans "Erledigt" %} ({{ completed_entries|length }})</h2>
+    <div class="d-flex flex-column gap-2 opacity-75">
+        {% for entry in completed_entries %}
+        <div class="card shadow-sm">
+            <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                <span class="text-decoration-line-through">{{ entry.title }}</span>
+                {% if can_edit %}
+                <form method="post" action="{% url 'list_kit:entry_toggle' collection.id entry.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0">Wieder öffnen</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if can_edit %}
+<div class="modal fade" id="newEntryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <form method="post" action="{% url 'list_kit:entry_add' collection.id %}" class="modal-content rounded-4">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">{% trans "Neuer Eintrag" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body d-flex flex-column gap-3">
+                <div>
+                    <label class="form-label fw-semibold">Titel</label>
+                    <input type="text" name="title" class="form-control" required>
+                </div>
+                {% if template.use_notes %}
+                <div>
+                    <label class="form-label fw-semibold">Notizen / Text</label>
+                    <textarea name="notes" rows="3" class="form-control"></textarea>
+                </div>
+                {% endif %}
+                <div class="row g-2">
+                    {% if template.use_status %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Status</label>
+                        <select name="status" class="form-select">
+                            {% for st in statuses %}
+                            <option value="{{ st.key }}">{{ st.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Sichtbarkeit</label>
+                        <select name="visibility" class="form-select">
+                            {% for vk, vl in visibility_choices %}
+                            <option value="{{ vk }}" {% if vk == 'internal' %}selected{% endif %}>{{ vl }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% if template.use_price or template.use_amount %}
+                <div class="row g-2">
+                    {% if template.use_price %}
+                    <div class="col-md-6"><label class="form-label fw-semibold">Preis (€)</label><input type="text" name="price" class="form-control"></div>
+                    {% endif %}
+                    {% if template.use_amount %}
+                    <div class="col-md-4"><label class="form-label fw-semibold">Menge</label><input type="text" name="amount_value" class="form-control"></div>
+                    <div class="col-md-2"><label class="form-label fw-semibold">Einheit</label><input type="text" name="amount_unit" class="form-control"></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if template.use_location or template.use_url or template.use_image %}
+                <div class="row g-2">
+                    {% if template.use_location %}<div class="col-md-4"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control"></div>{% endif %}
+                    {% if template.use_url %}<div class="col-md-4"><label class="form-label fw-semibold">URL</label><input type="url" name="url" class="form-control"></div>{% endif %}
+                    {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control"></div>{% endif %}
+                </div>
+                {% endif %}
+                {% for cf in custom_fields %}
+                <div>
+                    <label class="form-label fw-semibold">{{ cf.label }}</label>
+                    {% if cf.type == 'textarea' %}
+                    <textarea name="custom_{{ cf.key }}" rows="2" class="form-control"></textarea>
+                    {% elif cf.type == 'checkbox' %}
+                    <div class="form-check"><input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input"></div>
+                    {% else %}
+                    <input type="text" name="custom_{{ cf.key }}" class="form-control">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Abbrechen" %}</button>
+                <button type="submit" class="btn btn-primary">{% trans "Speichern" %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
