@@ -17,7 +17,8 @@ FIELD_DEFS = [
     {"key": "use_price", "label": "Preis / Betrag", "icon": "bi-currency-euro", "desc": "Geldbetrag in €", "default_zone": "footer"},
     {"key": "use_rating", "label": "Bewertung (1–5)", "icon": "bi-star", "desc": "Sterne-Bewertung", "default_zone": "footer"},
     {"key": "use_url", "label": "URL / Link", "icon": "bi-link-45deg", "desc": "Externer Link", "default_zone": "footer"},
-    {"key": "use_image", "label": "Bild-URL", "icon": "bi-image", "desc": "Titel- oder Vorschaubild", "default_zone": "body"},
+    {"key": "use_image", "label": "Fotos / Bildanhang", "icon": "bi-images", "desc": "Bild-URL oder Mehrfach-Foto-Upload", "default_zone": "body"},
+    {"key": "use_image_checklist", "label": "Fotos einzeln abhakbar", "icon": "bi-check2-square", "desc": "Hochgeladene Fotos mit Textzeile abhaken", "default_zone": "body"},
     {"key": "use_location", "label": "Ort / Raum", "icon": "bi-geo-alt", "desc": "Ortsangabe", "default_zone": "body"},
 ]
 

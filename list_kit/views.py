@@ -1,17 +1,19 @@
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 import json
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import get_template
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
-from .models import Collection, Entry, ListTemplate
+from .models import Collection, Entry, EntryImage, ListTemplate
 from .services import FIELD_DEFS, notify_staff_submission, seed_default_templates
 
 
@@ -77,7 +79,7 @@ def collection_detail_view(request, pk):
         return HttpResponseForbidden("Kein Zugriff auf diese Sammlung.")
 
     can_edit = _user_can_access_collection(request.user, col, write=True)
-    entries_qs = col.entries.select_related("created_by").all()
+    entries_qs = col.entries.select_related("created_by").prefetch_related("images").all()
     if not can_edit:
         entries_qs = entries_qs.filter(visibility="public")
 
@@ -202,8 +204,101 @@ def entry_save_view(request, pk, entry_id=None):
     entry.custom_data_json = custom_data
     entry.save()
 
+    if tpl.use_image:
+        new_captions = request.POST.getlist("new_image_captions")
+        for idx, img_file in enumerate(request.FILES.getlist("images")):
+            cap = (new_captions[idx] if idx < len(new_captions) else "").strip()[:200]
+            EntryImage.objects.create(entry=entry, image=img_file, caption=cap)
+
+        delete_ids = [int(i) for i in request.POST.getlist("delete_image_ids") if str(i).isdigit()]
+        if delete_ids:
+            entry.images.filter(id__in=delete_ids).delete()
+
+        for img in entry.images.all():
+            cap_key = f"existing_image_caption_{img.id}"
+            if cap_key in request.POST:
+                new_cap = (request.POST.get(cap_key) or "").strip()[:200]
+                if img.caption != new_cap:
+                    img.caption = new_cap
+                    img.save(update_fields=["caption"])
+
     messages.success(request, "Eintrag gespeichert.")
     return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+@require_POST
+def entry_image_toggle_view(request, pk, entry_id, image_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    img = get_object_or_404(EntryImage, pk=image_id, entry=entry)
+    img.is_checked = not img.is_checked
+    img.save(update_fields=["is_checked"])
+    return redirect("list_kit:collection_detail", pk=col.id)
+
+
+def collection_pdf_view(request, pk):
+    col = get_object_or_404(Collection.objects.select_related("template", "owner"), pk=pk)
+    if not _user_can_access_collection(request.user, col, write=False):
+        if not request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+            return redirect_to_login(request.get_full_path())
+        return HttpResponseForbidden("Kein Zugriff auf diese Sammlung.")
+
+    can_edit = _user_can_access_collection(request.user, col, write=True)
+    tpl = col.template
+    raw_pdf = (tpl.get_ui_style().get("pdf") or {})
+    pdf_cfg = {
+        "orientation": raw_pdf.get("orientation") if raw_pdf.get("orientation") in ("portrait", "landscape") else "portrait",
+        "filter": request.GET.get("filter") or raw_pdf.get("filter") or "all",
+        "include_summary": raw_pdf.get("include_summary", True),
+        "include_notes": raw_pdf.get("include_notes", True),
+        "include_photos": raw_pdf.get("include_photos", True),
+        "include_custom_fields": raw_pdf.get("include_custom_fields", True),
+        "include_dates": raw_pdf.get("include_dates", True),
+        "footer_text": raw_pdf.get("footer_text", ""),
+    }
+
+    qs = col.entries.select_related("created_by").prefetch_related("images").all()
+    if not can_edit:
+        qs = qs.filter(visibility="public")
+    all_entries = list(qs)
+    total_count = len(all_entries)
+    done_count = sum(1 for e in all_entries if e.is_completed)
+    open_count = total_count - done_count
+
+    if pdf_cfg["filter"] == "open":
+        entries = [e for e in all_entries if not e.is_completed]
+    elif pdf_cfg["filter"] == "done":
+        entries = [e for e in all_entries if e.is_completed]
+    else:
+        entries = all_entries
+
+    total_price = sum(float(e.price) for e in entries if e.price is not None) if tpl.use_price else None
+    ctx = {
+        "collection": col,
+        "template": tpl,
+        "entries": entries,
+        "pdf_cfg": pdf_cfg,
+        "total_count": total_count,
+        "open_count": open_count,
+        "done_count": done_count,
+        "total_price": total_price,
+    }
+    html = get_template("list_kit/pdf_export.html").render(ctx)
+    try:
+        from xhtml2pdf import pisa
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        if not pdf.err:
+            resp = HttpResponse(result.getvalue(), content_type="application/pdf")
+            resp["Content-Disposition"] = f'inline; filename="{col.slug or col.id}.pdf"'
+            return resp
+    except ImportError:
+        pass
+    return HttpResponse(html)
 
 
 @login_required
@@ -387,6 +482,23 @@ def builder_edit_view(request, pk=None):
             except (ValueError, TypeError):
                 card_layout = None
 
+        pdf_orientation = request.POST.get("pdf_orientation", "portrait")
+        if pdf_orientation not in ("portrait", "landscape"):
+            pdf_orientation = "portrait"
+        pdf_filter = request.POST.get("pdf_filter", "all")
+        if pdf_filter not in ("all", "open", "done"):
+            pdf_filter = "all"
+        pdf_cfg = {
+            "orientation": pdf_orientation,
+            "filter": pdf_filter,
+            "include_summary": request.POST.get("pdf_include_summary") == "on",
+            "include_notes": request.POST.get("pdf_include_notes") == "on",
+            "include_photos": request.POST.get("pdf_include_photos") == "on",
+            "include_custom_fields": request.POST.get("pdf_include_custom_fields") == "on",
+            "include_dates": request.POST.get("pdf_include_dates") == "on",
+            "footer_text": (request.POST.get("pdf_footer_text") or "").strip()[:160],
+        }
+
         tpl.ui_style_json = {
             "layout_mode": layout_mode,
             "card_width": card_width,
@@ -394,6 +506,7 @@ def builder_edit_view(request, pk=None):
             "show_creator": request.POST.get("ui_show_creator") == "on",
             "genre": genre,
             "card_layout": card_layout,
+            "pdf": pdf_cfg,
         }
         tpl.save()
         messages.success(request, f"Vorlage „{tpl.name}“ gespeichert.")
@@ -419,6 +532,7 @@ def builder_edit_view(request, pk=None):
         "active_keys_json": json.dumps(active_keys),
         "custom_fields_json": json.dumps(custom_fields),
         "statuses_json": json.dumps(statuses),
+        "ui_style": ui_style,
         "ui_style_json": json.dumps(ui_style),
         "content_type_choices": ListTemplate.CONTENT_TYPE_CHOICES,
     })
@@ -447,9 +561,16 @@ def builder_export_view(request, pk):
 @staff_member_required
 @require_POST
 def builder_import_view(request):
-    raw = (request.POST.get("json_payload") or "").strip()
+    raw = (request.POST.get("json_payload") or request.POST.get("template_json") or "").strip()
     if not raw and request.FILES.get("json_file"):
-        raw = request.FILES["json_file"].read().decode("utf-8", errors="replace")
+        raw = request.FILES["json_file"].read().decode("utf-8", errors="replace").strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        raw = "\n".join(lines).strip()
     try:
         data = json.loads(raw)
         if not isinstance(data, dict) or not data.get("name"):

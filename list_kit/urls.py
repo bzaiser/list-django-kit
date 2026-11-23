@@ -14,10 +14,12 @@ urlpatterns = [
     path("builder/<int:pk>/export/", views.builder_export_view, name="builder_export"),
     path("builder/<int:pk>/delete/", views.builder_delete_view, name="builder_delete"),
     path("<uuid:pk>/", views.collection_detail_view, name="collection_detail"),
+    path("<uuid:pk>/pdf/", views.collection_pdf_view, name="collection_pdf"),
     path("submit/<uuid:pk>/", views.public_submit_view, name="public_submit"),
     path("<uuid:pk>/delete/", views.collection_delete_view, name="collection_delete"),
     path("<uuid:pk>/entries/add/", views.entry_save_view, name="entry_add"),
     path("<uuid:pk>/entries/<int:entry_id>/edit/", views.entry_save_view, name="entry_edit"),
     path("<uuid:pk>/entries/<int:entry_id>/toggle/", views.entry_toggle_view, name="entry_toggle"),
+    path("<uuid:pk>/entries/<int:entry_id>/images/<int:image_id>/toggle/", views.entry_image_toggle_view, name="entry_image_toggle"),
     path("<uuid:pk>/entries/<int:entry_id>/delete/", views.entry_delete_view, name="entry_delete"),
 ]

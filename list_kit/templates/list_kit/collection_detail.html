@@ -12,6 +12,9 @@
         <h1 class="h3 fw-bold mb-0"><i class="bi {{ template.icon|default:'bi-card-checklist' }} text-primary me-2"></i>{{ collection.title }}</h1>
     </div>
     <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'list_kit:collection_pdf' collection.id %}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="bi bi-file-earmark-pdf me-1"></i>{% trans "PDF / Drucken" %}
+        </a>
         {% if can_edit %}
         <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#newEntryModal">
             <i class="bi bi-plus-circle me-1"></i>{% trans "Neuer Eintrag" %}
@@ -66,6 +69,9 @@
                                     {% endif %}
                                 {% endfor %}
                             </div>
+                            {% endif %}
+                            {% if template.use_image %}
+                                {% include "list_kit/partials/_photo_gallery.html" with gallery_suffix="row" %}
                             {% endif %}
                         {% endif %}
                     </div>
@@ -123,7 +129,7 @@
 {% if can_edit %}
 <div class="modal fade" id="newEntryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-        <form method="post" action="{% url 'list_kit:entry_add' collection.id %}" class="modal-content rounded-4">
+        <form method="post" action="{% url 'list_kit:entry_add' collection.id %}" enctype="multipart/form-data" class="modal-content rounded-4">
             {% csrf_token %}
             <div class="modal-header">
                 <h5 class="modal-title fw-bold">{% trans "Neuer Eintrag" %}</h5>
@@ -178,6 +184,16 @@
                     {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control"></div>{% endif %}
                 </div>
                 {% endif %}
+                {% if template.use_image %}
+                <div class="border rounded-3 p-3 bg-body-tertiary">
+                    <label class="form-label fw-semibold"><i class="bi bi-images me-1"></i>Fotos hochladen (Mehrfachauswahl)</label>
+                    <input type="file" id="lk-images-input" name="images" multiple accept="image/*" class="form-control mb-2">
+                    <div id="lk-images-compressing" class="small text-primary d-none mb-2">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Optimiere ausgewählte Fotos…
+                    </div>
+                    <div id="lk-new-images-preview" class="d-flex flex-column gap-2"></div>
+                </div>
+                {% endif %}
                 {% for cf in custom_fields %}
                 <div>
                     <label class="form-label fw-semibold">{{ cf.label }}</label>
@@ -199,4 +215,146 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Leuchtkasten Modal -->
+<div class="modal fade" id="lkPhotoLightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-sm-down">
+        <div class="modal-content bg-dark text-white border-0 rounded-4 overflow-hidden">
+            <div class="modal-header border-secondary border-opacity-25 py-2 px-3">
+                <div class="d-flex align-items-center gap-2 min-w-0">
+                    <span id="lkLbCounter" class="badge text-bg-secondary">1 / 1</span>
+                    <h6 class="modal-title mb-0 text-truncate" id="lkLbTitle">Foto</h6>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body p-2 p-sm-3 d-flex align-items-center justify-content-center position-relative bg-black" id="lkLbStage">
+                <button type="button" id="lkLbPrev" class="btn btn-dark bg-opacity-75 border border-secondary border-opacity-50 rounded-circle position-absolute start-0 ms-2 top-50 translate-middle-y z-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;"><i class="bi bi-chevron-left"></i></button>
+                <img id="lkLbImg" src="" alt="Foto" class="img-fluid rounded-2 object-fit-contain" style="max-height: 75vh;">
+                <button type="button" id="lkLbNext" class="btn btn-dark bg-opacity-75 border border-secondary border-opacity-50 rounded-circle position-absolute end-0 me-2 top-50 translate-middle-y z-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;"><i class="bi bi-chevron-right"></i></button>
+            </div>
+            <div class="modal-footer border-secondary border-opacity-25 py-2 px-3 d-flex justify-content-between align-items-center">
+                <span id="lkLbCaption" class="small text-light text-break"></span>
+                <a id="lkLbRaw" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">Original</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    let lbPhotos = [], lbIdx = 0, touchX = null;
+    function renderLb() {
+        if (!lbPhotos.length) return;
+        const cur = lbPhotos[lbIdx] || lbPhotos[0];
+        document.getElementById('lkLbImg').src = cur.url || '';
+        document.getElementById('lkLbTitle').textContent = cur.title || cur.caption || 'Foto';
+        document.getElementById('lkLbCaption').textContent = cur.caption || '';
+        document.getElementById('lkLbCounter').textContent = (lbIdx + 1) + ' / ' + lbPhotos.length;
+        document.getElementById('lkLbRaw').href = cur.url || '#';
+        const multi = lbPhotos.length > 1;
+        document.getElementById('lkLbPrev').classList.toggle('d-none', !multi);
+        document.getElementById('lkLbNext').classList.toggle('d-none', !multi);
+    }
+    window.openLkPhotoLightboxFromEl = function(el, idx) {
+        const holder = el && (el.closest('[data-lk-photos]') || el);
+        if (!holder) return;
+        try {
+            lbPhotos = JSON.parse(holder.getAttribute('data-lk-photos') || '[]');
+            lbIdx = Math.max(0, Math.min(Number(idx) || 0, lbPhotos.length - 1));
+            renderLb();
+            const m = document.getElementById('lkPhotoLightboxModal');
+            if (m && window.bootstrap) bootstrap.Modal.getOrCreateInstance(m).show();
+        } catch (e) {}
+    };
+    document.addEventListener('DOMContentLoaded', function() {
+        const prev = document.getElementById('lkLbPrev');
+        const next = document.getElementById('lkLbNext');
+        const stage = document.getElementById('lkLbStage');
+        if (prev) prev.addEventListener('click', () => { if (lbPhotos.length > 1) { lbIdx = (lbIdx - 1 + lbPhotos.length) % lbPhotos.length; renderLb(); } });
+        if (next) next.addEventListener('click', () => { if (lbPhotos.length > 1) { lbIdx = (lbIdx + 1) % lbPhotos.length; renderLb(); } });
+        if (stage) {
+            stage.addEventListener('touchstart', e => { if (e.changedTouches.length) touchX = e.changedTouches[0].clientX; }, { passive: true });
+            stage.addEventListener('touchend', e => {
+                if (touchX === null || lbPhotos.length < 2 || !e.changedTouches.length) return;
+                const dx = e.changedTouches[0].clientX - touchX;
+                touchX = null;
+                if (Math.abs(dx) > 40) { lbIdx = dx < 0 ? (lbIdx + 1) % lbPhotos.length : (lbIdx - 1 + lbPhotos.length) % lbPhotos.length; renderLb(); }
+            }, { passive: true });
+        }
+
+        const imgInput = document.getElementById('lk-images-input');
+        const previewBox = document.getElementById('lk-new-images-preview');
+        const compHint = document.getElementById('lk-images-compressing');
+        let pendingFiles = [], pendingCaps = [];
+        function compressFile(file) {
+            return new Promise(resolve => {
+                if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/gif') return resolve(file);
+                const r = new FileReader();
+                r.onerror = () => resolve(file);
+                r.onload = ev => {
+                    const im = new Image();
+                    im.onerror = () => resolve(file);
+                    im.onload = () => {
+                        const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+                        const s = Math.min(1, 1600 / Math.max(w, h));
+                        const c = document.createElement('canvas');
+                        c.width = Math.round(w * s); c.height = Math.round(h * s);
+                        const ctx = c.getContext('2d');
+                        if (!ctx) return resolve(file);
+                        ctx.drawImage(im, 0, 0, c.width, c.height);
+                        c.toBlob(b => {
+                            if (!b || (s === 1 && b.size >= file.size)) return resolve(file);
+                            try { resolve(new File([b], (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })); }
+                            catch (e) { resolve(b); }
+                        }, 'image/jpeg', 0.82);
+                    };
+                    im.src = ev.target.result;
+                };
+                r.readAsDataURL(file);
+            });
+        }
+        function renderPreviews() {
+            if (!previewBox) return;
+            previewBox.innerHTML = '';
+            pendingFiles.forEach((f, idx) => {
+                const row = document.createElement('div');
+                row.className = 'border rounded-3 p-2 bg-body d-flex align-items-center gap-2';
+                const img = document.createElement('img');
+                img.className = 'img-thumbnail rounded-2 object-fit-cover flex-shrink-0';
+                img.style.width = '48px'; img.style.height = '48px';
+                img.src = URL.createObjectURL(f);
+                const inp = document.createElement('input');
+                inp.type = 'text'; inp.name = 'new_image_captions'; inp.maxLength = 200;
+                inp.className = 'form-control form-control-sm';
+                inp.placeholder = 'Textzeile zum Foto (optional)';
+                inp.value = pendingCaps[idx] || '';
+                inp.addEventListener('input', () => { pendingCaps[idx] = inp.value; });
+                row.appendChild(img); row.appendChild(inp);
+                previewBox.appendChild(row);
+            });
+        }
+        if (imgInput) {
+            imgInput.addEventListener('change', async () => {
+                const files = Array.from(imgInput.files || []);
+                if (!files.length) return;
+                if (compHint) compHint.classList.remove('d-none');
+                try {
+                    for (const f of files) {
+                        pendingFiles.push(await compressFile(f));
+                        pendingCaps.push('');
+                    }
+                    if (typeof DataTransfer !== 'undefined') {
+                        const dt = new DataTransfer();
+                        pendingFiles.forEach(f => dt.items.add(f));
+                        imgInput.files = dt.files;
+                    }
+                    renderPreviews();
+                } finally {
+                    if (compHint) compHint.classList.add('d-none');
+                }
+            });
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: list-django-kit
+Version: 1.0.0
+Summary: Reusable Django dynamic list, content-type and visual drag-and-drop builder kit matching django-design-studio.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: Django>=4.2
+
+# list-django-kit
+
+Wiederverwendbares Baukasten-Kit für dynamische Listen, feste Inhaltstypen (`list`, `news`, `faq`, `form_inbox`) und einen visuellen 3-Spalten-Template-Builder im `django-design-studio`-Design.
+
+## URLs
+- `/lists/` – Sammlungen & Listenübersicht
+- `/lists/create/` – Neue Sammlung aus Vorlage anlegen
+- `/lists/<uuid:pk>/` – Listen-/Detailansicht mit dynamischen Feldern
+- `/lists/builder/` – Template-Builder (Staff)

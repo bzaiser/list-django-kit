@@ -16,8 +16,10 @@
     <span class="badge text-bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>{{ entry.rating }}/5</span>
 {% elif field_key == 'use_url' and template.use_url and entry.url %}
     <a href="{{ entry.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2"><i class="bi bi-box-arrow-up-right me-1"></i>Link</a>
-{% elif field_key == 'use_image' and template.use_image and entry.image_url %}
-    <a href="{{ entry.image_url }}" target="_blank"><img src="{{ entry.image_url }}" alt="{{ entry.title }}" class="img-thumbnail rounded-2" width="64"></a>
+{% elif field_key == 'use_image' and template.use_image %}
+    {% include "list_kit/partials/_photo_gallery.html" with gallery_suffix="field" %}
+{% elif field_key == 'use_image_checklist' and template.use_image_checklist and not template.use_image %}
+    {% include "list_kit/partials/_photo_gallery.html" with gallery_suffix="field" %}
 {% else %}
     {% for cf in custom_display %}
         {% with cf_id="cf:"|add:cf.key %}

@@ -11,6 +11,7 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{% url 'list_kit:collection_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">{% trans "Sammlungen" %}</a>
+        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#lkAiTemplateModal"><i class="bi bi-stars me-1"></i>{% trans "KI-Assistent" %}</button>
         <a href="{% url 'list_kit:builder_create' %}" class="btn btn-primary btn-sm rounded-pill px-3"><i class="bi bi-plus-circle me-1"></i>{% trans "Neue Vorlage" %}</a>
     </div>
 </div>
@@ -59,4 +60,93 @@
         </form>
     </div>
 </div>
+
+<!-- KI-Vorlagen-Assistent Modal -->
+<div class="modal fade" id="lkAiTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <form class="modal-content rounded-4" action="{% url 'list_kit:builder_import' %}" method="post">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-stars me-1"></i>KI-Vorlagen-Assistent</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body d-flex flex-column gap-3">
+                <div class="row g-2">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold">Name der Liste / Vorlage</label>
+                        <input type="text" id="lk-ai-name" class="form-control form-control-sm" placeholder="z. B. Vereins-Verleih">
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label small fw-semibold">Gewünschte Felder &amp; Funktion</label>
+                        <input type="text" id="lk-ai-desc" class="form-control form-control-sm" placeholder="z. B. Fotos einzeln abhakbar, Enddatum, Ort">
+                    </div>
+                </div>
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold">Prompt für KI (kopieren &amp; ausführen):</span>
+                        <button type="button" id="lk-ai-copy" class="btn btn-sm btn-outline-primary py-0">Prompt kopieren</button>
+                    </div>
+                    <textarea id="lk-ai-prompt" rows="6" class="form-control form-control-sm font-monospace" readonly></textarea>
+                </div>
+                <div>
+                    <label class="form-label small fw-semibold">Antwort-JSON hier einfügen:</label>
+                    <textarea name="template_json" rows="5" class="form-control form-control-sm font-monospace" required placeholder='{"name": "...", "content_type": "list", ...}'></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Vorlage importieren</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function() {
+    const nameEl = document.getElementById('lk-ai-name');
+    const descEl = document.getElementById('lk-ai-desc');
+    const promptEl = document.getElementById('lk-ai-prompt');
+    const copyBtn = document.getElementById('lk-ai-copy');
+    function updatePrompt() {
+        const n = (nameEl && nameEl.value.trim()) || 'Meine neue Liste';
+        const d = (descEl && descEl.value.trim()) || 'Verwaltung von Einträgen mit passenden Feldern.';
+        if (!promptEl) return;
+        promptEl.value = `Erstelle genau EIN valides JSON-Objekt (ohne weiteren Text) für django-list-kit:
+Name: ${n}
+Beschreibung: ${d}
+
+Schema:
+{
+  "name": "${n}",
+  "icon": "bi-card-checklist",
+  "content_type": "list | news | faq | form_inbox",
+  "description": "Kurzbeschreibung",
+  "flags": {
+    "use_notes": true, "use_status": true, "use_start_date": false, "use_end_date": false,
+    "use_reminder": false, "use_amount": false, "use_price": false, "use_rating": false,
+    "use_url": false, "use_image": false, "use_image_checklist": false, "use_location": false
+  },
+  "allowed_statuses_json": [
+    {"key": "open", "label": "Offen", "completes": false},
+    {"key": "done", "label": "Erledigt", "completes": true}
+  ],
+  "custom_fields_json": [
+    {"key": "feld_key", "label": "Feldname", "type": "text | textarea | markdown | number | currency | date | url | image | select | radio | multiselect | checkbox | rating | color", "options": "", "zone": "body", "show_on_card": true}
+  ],
+  "ui_style_json": {
+    "layout_mode": "row | cards | stacked",
+    "card_width": "1/3",
+    "density": "normal | compact",
+    "show_creator": true,
+    "pdf": {"orientation": "portrait", "filter": "all", "include_summary": true, "include_notes": true, "include_photos": true, "include_custom_fields": true, "include_dates": true, "footer_text": ""}
+  }
+}`;
+    }
+    if (nameEl) nameEl.addEventListener('input', updatePrompt);
+    if (descEl) descEl.addEventListener('input', updatePrompt);
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+        if (navigator.clipboard && promptEl) navigator.clipboard.writeText(promptEl.value);
+    });
+    updatePrompt();
+})();
+</script>
 {% endblock %}

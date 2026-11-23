@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ collection.title }} – Druck / PDF</title>
+    <style>
+        @page { size: A4 {{ pdf_cfg.orientation|default:"portrait" }}; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #222; line-height: 1.35; }
+        .header { border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .title { font-size: 18pt; font-weight: bold; margin: 0; }
+        .subtitle { font-size: 10pt; color: #555; margin-top: 3px; }
+        .kpi-bar { background-color: #f4f6f9; border: 1px solid #d9e0e8; padding: 6px 10px; margin-bottom: 12px; font-size: 9.5pt; }
+        .kpi-item { margin-right: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: #eef1f5; text-align: left; padding: 6px 7px; border-bottom: 1.5px solid #bbb; font-size: 8.5pt; text-transform: uppercase; color: #444; }
+        tr { page-break-inside: avoid; }
+        td { padding: 7px; border-bottom: 1px solid #e2e6ea; vertical-align: top; }
+        .completed { text-decoration: line-through; color: #777; }
+        .badge { display: inline-block; padding: 1px 5px; font-size: 8pt; background-color: #e9ecef; color: #333; border: 1px solid #ced4da; margin-right: 4px; }
+        .meta { font-size: 8.5pt; color: #555; margin-top: 3px; }
+        .photo-strip { margin-top: 5px; }
+        .photo-box { display: inline-block; border: 1px solid #ddd; padding: 3px; margin-right: 6px; margin-bottom: 4px; text-align: center; vertical-align: top; width: 78px; }
+        .photo-box img { max-width: 70px; max-height: 70px; }
+        .photo-cap { font-size: 7.5pt; color: #444; margin-top: 2px; }
+        .footer { margin-top: 16px; text-align: center; font-size: 8pt; color: #777; border-top: 1px solid #ddd; padding-top: 4px; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 12px;">
+        <button type="button" onclick="window.print()" style="padding: 6px 12px; cursor: pointer;">Drucken / Als PDF speichern</button>
+    </div>
+
+    <div class="header">
+        <div>
+            <h1 class="title">{{ collection.title }}</h1>
+            <div class="subtitle">{{ template.name }} · Erstellt am {{ collection.created_at|date:"d.m.Y" }}</div>
+        </div>
+    </div>
+
+    {% if pdf_cfg.include_summary %}
+    <div class="kpi-bar">
+        <span class="kpi-item"><strong>Gesamt:</strong> {{ total_count }}</span>
+        <span class="kpi-item"><strong>Offen:</strong> {{ open_count }}</span>
+        <span class="kpi-item"><strong>Erledigt:</strong> {{ done_count }}</span>
+        {% if total_price is not None %}
+        <span class="kpi-item"><strong>Summe:</strong> {{ total_price|floatformat:2 }} €</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <table>
+        <thead>
+            <tr>
+                <th width="28"></th>
+                <th>Eintrag &amp; Details</th>
+                {% if template.use_amount %}<th width="70">Menge</th>{% endif %}
+                {% if template.use_price %}<th width="65">Preis</th>{% endif %}
+                {% if template.use_rating %}<th width="65">Bewertung</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td style="text-align: center; font-weight: bold;">{% if entry.is_completed %}[x]{% else %}[ ]{% endif %}</td>
+                <td>
+                    <div class="{% if entry.is_completed %}completed{% endif %}">
+                        <strong>{{ entry.title }}</strong>
+                        {% if template.use_status %}<span class="badge">{{ entry.status }}</span>{% endif %}
+                    </div>
+                    {% if pdf_cfg.include_notes and entry.notes %}
+                        <div class="meta">{{ entry.notes }}</div>
+                    {% endif %}
+                    {% if pdf_cfg.include_dates %}
+                        {% if entry.start_date or entry.end_date or entry.location %}
+                        <div class="meta">
+                            {% if entry.start_date %}Start: {{ entry.start_date|date:"d.m.Y H:i" }} · {% endif %}
+                            {% if entry.end_date %}Ende: {{ entry.end_date|date:"d.m.Y H:i" }} · {% endif %}
+                            {% if entry.location %}Ort: {{ entry.location }}{% endif %}
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    {% if pdf_cfg.include_custom_fields %}
+                        {% with cf_list=entry.get_custom_field_display %}
+                        {% if cf_list %}
+                        <div class="meta">
+                            {% for cf in cf_list %}<span class="badge">{{ cf.label }}: {{ cf.value }}</span>{% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                    {% if pdf_cfg.include_photos and template.use_image %}
+                        {% with photos=entry.get_all_photos %}
+                        {% if photos %}
+                        <div class="photo-strip">
+                            {% for p in photos %}
+                            <div class="photo-box">
+                                <img src="{{ p.url }}" alt="{{ p.caption|default:entry.title }}">
+                                {% if template.use_image_checklist and p.id %}
+                                    <div class="photo-cap">{% if p.is_checked %}[x]{% else %}[ ]{% endif %} {{ p.caption|default:"Foto" }}</div>
+                                {% elif p.caption %}
+                                    <div class="photo-cap">{{ p.caption }}</div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </td>
+                {% if template.use_amount %}<td>{% if entry.amount_value is not None %}{{ entry.amount_value|floatformat:"-2" }} {{ entry.amount_unit }}{% else %}-{% endif %}</td>{% endif %}
+                {% if template.use_price %}<td>{% if entry.price is not None %}{{ entry.price }} €{% else %}-{% endif %}</td>{% endif %}
+                {% if template.use_rating %}<td>{% if entry.rating %}{{ entry.rating }}/5{% else %}-{% endif %}</td>{% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="text-align: center; color: #777;">Keine Einträge vorhanden.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        {% if pdf_cfg.footer_text %}{{ pdf_cfg.footer_text }} · {% endif %}Generiert am {% now "d.m.Y H:i" %}
+    </div>
+</body>
+</html>

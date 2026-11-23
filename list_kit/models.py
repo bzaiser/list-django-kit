@@ -29,6 +29,7 @@ class ListTemplate(models.Model):
     use_rating = models.BooleanField(default=False)
     use_url = models.BooleanField(default=False)
     use_image = models.BooleanField(default=False)
+    use_image_checklist = models.BooleanField(default=False)
     use_location = models.BooleanField(default=False)
 
     custom_fields_json = models.JSONField(default=list, blank=True)
@@ -209,5 +210,46 @@ class Entry(models.Model):
             })
         return result
 
+    def get_all_photos(self) -> list[dict]:
+        photos = []
+        if self.image_url:
+            photos.append({
+                "id": None,
+                "url": self.image_url,
+                "caption": "",
+                "is_checked": False,
+                "is_legacy": True,
+            })
+        for img in self.images.all():
+            photos.append({
+                "id": img.id,
+                "url": img.image.url,
+                "caption": img.caption or "",
+                "is_checked": img.is_checked,
+                "is_legacy": False,
+            })
+        return photos
+
+    def photo_checklist_summary(self):
+        imgs = list(self.images.all())
+        if not imgs:
+            return None
+        done = sum(1 for img in imgs if img.is_checked)
+        return {"done": done, "total": len(imgs)}
+
     def __str__(self):
         return self.title
+
+
+class EntryImage(models.Model):
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name="images")
+    image = models.FileField(upload_to="list_kit_photos/")
+    caption = models.CharField(max_length=200, blank=True, default="")
+    is_checked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"Foto für {self.entry.title}"

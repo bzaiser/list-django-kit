@@ -205,6 +205,76 @@ class ListKitTests(TestCase):
         self.assertEqual(created.visibility, "draft")
         self.assertEqual(created.custom_data_json.get("absender_name"), "Max")
 
+    def test_multi_photo_captions_checkoff_pdf_and_ai_import(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from list_kit.models import EntryImage
+
+        self.client.force_login(self.staff)
+        # 1. JSON paste import (with markdown fence + use_image_checklist + pdf config)
+        imp_resp = self.client.post(reverse("list_kit:builder_import"), {
+            "template_json": """```json
+{
+  "name": "Verleih-Fotos",
+  "content_type": "list",
+  "flags": {"use_image": true, "use_image_checklist": true, "use_price": true},
+  "ui_style_json": {
+    "layout_mode": "row",
+    "pdf": {"orientation": "landscape", "filter": "all", "include_summary": true, "include_photos": true, "footer_text": "Verleih"}
+  }
+}
+```"""
+        })
+        self.assertEqual(imp_resp.status_code, 302)
+        tpl = ListTemplate.objects.get(name="Verleih-Fotos")
+        self.assertTrue(tpl.use_image)
+        self.assertTrue(tpl.use_image_checklist)
+
+        col = Collection.objects.create(title="Werkzeugverleih", template=tpl, owner=self.staff)
+        tiny_png = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01"
+            b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        f1 = SimpleUploadedFile("p1.png", tiny_png, content_type="image/png")
+        f2 = SimpleUploadedFile("p2.png", tiny_png, content_type="image/png")
+        add_resp = self.client.post(reverse("list_kit:entry_add", args=[col.id]), {
+            "title": "Koffer 1",
+            "price": "25.00",
+            "images": [f1, f2],
+            "new_image_captions": ["Bohrer", "Akku"],
+        })
+        self.assertEqual(add_resp.status_code, 302)
+
+        entry = Entry.objects.get(collection=col, title="Koffer 1")
+        imgs = list(entry.images.order_by("id"))
+        self.assertEqual(len(imgs), 2)
+        self.assertEqual(imgs[0].caption, "Bohrer")
+        self.assertEqual(imgs[1].caption, "Akku")
+
+        # Toggle photo 1 checked
+        tog = self.client.post(reverse("list_kit:entry_image_toggle", args=[col.id, entry.id, imgs[0].id]))
+        self.assertEqual(tog.status_code, 302)
+        imgs[0].refresh_from_db()
+        self.assertTrue(imgs[0].is_checked)
+
+        # Detail page renders carousel & lightbox
+        det = self.client.get(reverse("list_kit:collection_detail", args=[col.id]))
+        self.assertEqual(det.status_code, 200)
+        self.assertContains(det, "carousel")
+        self.assertContains(det, "openLkPhotoLightboxFromEl")
+        self.assertContains(det, "Fotos abhaken")
+
+        # PDF/Print view renders cleanly
+        pdf_resp = self.client.get(reverse("list_kit:collection_pdf", args=[col.id]))
+        self.assertEqual(pdf_resp.status_code, 200)
+        self.assertTrue(
+            pdf_resp["Content-Type"].startswith("application/pdf")
+            or b"Werkzeugverleih" in pdf_resp.content
+        )
+
+        for img in EntryImage.objects.filter(entry=entry):
+            img.image.delete(save=False)
+
 
 if __name__ == "__main__":
     import unittest
