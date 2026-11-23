@@ -28,6 +28,18 @@
     </div>
 </div>
 
+{% if template.content_type == 'form_inbox' and inbox_tabs %}
+<ul class="nav nav-pills gap-2 mb-3">
+    {% for tab in inbox_tabs %}
+    <li class="nav-item">
+        <a href="?status={{ tab.key }}" class="nav-link py-1 px-3 rounded-pill {% if status_filter == tab.key %}active{% else %}bg-body-secondary text-body{% endif %}">
+            {{ tab.label }} <span class="badge {% if status_filter == tab.key %}bg-white text-primary{% else %}bg-secondary-subtle text-body{% endif %} ms-1">{{ tab.count }}</span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
 <div class="{% if ui.layout_mode == 'cards' %}row g-3{% else %}d-flex flex-column gap-2{% endif %}">
     {% for entry in active_entries %}
     {% with custom_display=entry.get_custom_field_display %}
@@ -35,7 +47,7 @@
         <div class="card shadow-sm h-100">
             <div class="card-body {% if ui.density == 'compact' %}p-2{% else %}p-3{% endif %} d-flex flex-column justify-content-between gap-2">
                 <div class="d-flex align-items-start gap-2">
-                    {% if can_edit %}
+                    {% if can_edit and template.content_type != 'form_inbox' %}
                     <form method="post" action="{% url 'list_kit:entry_toggle' collection.id entry.id %}" class="mt-1">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-secondary p-0 px-1" title="Status umschalten">
@@ -47,7 +59,12 @@
                         {% if ui.card_layout %}
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <strong class="text-break">{{ entry.title }}</strong>
-                                {% if template.use_status %}<span class="badge text-bg-info">{{ entry.status }}</span>{% endif %}
+                                {% if template.use_status %}
+                                    <span class="badge {% if template.content_type == 'form_inbox' %}{% if entry.status == 'Bestätigt' %}text-bg-primary{% elif entry.status == 'Teilgenommen' %}text-bg-success{% elif entry.status == 'Abgesagt' or entry.status == 'Abgelehnt' %}text-bg-danger{% else %}text-bg-warning{% endif %}{% else %}text-bg-info{% endif %}">{{ entry.status }}</span>
+                                {% endif %}
+                                {% if template.content_type == 'form_inbox' and entry.custom_data_json.is_paid %}
+                                    <span class="badge text-bg-success"><i class="bi bi-check-lg me-1"></i>Bezahlt</span>
+                                {% endif %}
                                 {% for fk in ui.card_layout.header %}
                                     {% include "list_kit/partials/_entry_field.html" with field_key=fk %}
                                 {% endfor %}
@@ -62,7 +79,12 @@
                         {% else %}
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <strong class="text-break">{{ entry.title }}</strong>
-                                {% if template.use_status %}<span class="badge text-bg-info">{{ entry.status }}</span>{% endif %}
+                                {% if template.use_status %}
+                                    <span class="badge {% if template.content_type == 'form_inbox' %}{% if entry.status == 'Bestätigt' %}text-bg-primary{% elif entry.status == 'Teilgenommen' %}text-bg-success{% elif entry.status == 'Abgesagt' or entry.status == 'Abgelehnt' %}text-bg-danger{% else %}text-bg-warning{% endif %}{% else %}text-bg-info{% endif %}">{{ entry.status }}</span>
+                                {% endif %}
+                                {% if template.content_type == 'form_inbox' and entry.custom_data_json.is_paid %}
+                                    <span class="badge text-bg-success"><i class="bi bi-check-lg me-1"></i>Bezahlt</span>
+                                {% endif %}
                                 <span class="badge bg-body-secondary text-body border">{{ entry.get_visibility_display }}</span>
                             </div>
                             {% if entry.notes %}<p class="small text-muted mb-0 mt-1 text-break">{{ entry.notes|truncatechars:140 }}</p>{% endif %}
@@ -98,12 +120,30 @@
                         <form method="post" action="{% url 'list_kit:entry_confirm' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="decision" value="confirm">
-                            <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2" title="Bestätigen"><i class="bi bi-check-lg"></i></button>
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm {% if entry.status == 'Bestätigt' %}btn-primary{% else %}btn-outline-primary{% endif %} py-0 px-2" title="Bestätigen"><i class="bi bi-check-lg"></i> Bestätigen</button>
                         </form>
+                        {% if template.slug == 'kurs-anmeldung' or template.slug == 'mitgliedsantrag' or template.use_price %}
+                        <form method="post" action="{% url 'list_kit:entry_confirm' collection.id entry.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="decision" value="paid">
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm {% if entry.custom_data_json.is_paid %}btn-success{% else %}btn-outline-success{% endif %} py-0 px-2" title="Bezahlt umschalten"><i class="bi bi-currency-euro"></i> Bezahlt</button>
+                        </form>
+                        {% endif %}
+                        {% if template.slug == 'kurs-anmeldung' %}
+                        <form method="post" action="{% url 'list_kit:entry_confirm' collection.id entry.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="decision" value="attended">
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm {% if entry.status == 'Teilgenommen' %}btn-success{% else %}btn-outline-secondary{% endif %} py-0 px-2" title="Teilgenommen"><i class="bi bi-mortarboard"></i> Teilgenommen</button>
+                        </form>
+                        {% endif %}
                         <form method="post" action="{% url 'list_kit:entry_confirm' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="decision" value="reject">
-                            <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2" title="Ablehnen"><i class="bi bi-x-lg"></i></button>
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm {% if entry.status == 'Abgesagt' or entry.status == 'Abgelehnt' %}btn-danger{% else %}btn-outline-warning{% endif %} py-0 px-2" title="Absagen"><i class="bi bi-x-lg"></i> Absagen</button>
                         </form>
                         {% if template.slug == 'mitgliedsantrag' and not entry.custom_data_json.created_person_id %}
                         <form method="post" action="{% url 'list_kit:entry_create_person' collection.id entry.id %}" class="d-inline">

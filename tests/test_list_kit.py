@@ -275,6 +275,51 @@ class ListKitTests(TestCase):
         for img in EntryImage.objects.filter(entry=entry):
             img.image.delete(save=False)
 
+    def test_form_inbox_status_workflow_and_paid_flag(self):
+        self.client.force_login(self.staff)
+        seed_default_templates()
+        tpl = ListTemplate.objects.get(slug="kurs-anmeldung")
+        col = Collection.objects.create(title="Kursanmeldungen", template=tpl, owner=self.staff)
+        e1 = Entry.objects.create(collection=col, title="Max Mustermann", status="Offen")
+        e2 = Entry.objects.create(collection=col, title="Erika Alt", status="Abgelehnt")
+
+        # Confirm -> Bestätigt, is_completed remains False
+        r = self.client.post(reverse("list_kit:entry_confirm", args=[col.id, e1.id]), {"decision": "confirm"})
+        self.assertEqual(r.status_code, 302)
+        e1.refresh_from_db()
+        self.assertEqual(e1.status, "Bestätigt")
+        self.assertFalse(e1.is_completed)
+
+        # Paid -> separate flag is_paid=True, status stays Bestätigt
+        r = self.client.post(reverse("list_kit:entry_confirm", args=[col.id, e1.id]), {"decision": "paid"})
+        self.assertEqual(r.status_code, 302)
+        e1.refresh_from_db()
+        self.assertEqual(e1.status, "Bestätigt")
+        self.assertTrue(e1.custom_data_json.get("is_paid"))
+        self.assertFalse(e1.is_completed)
+
+        det_paid = self.client.get(reverse("list_kit:collection_detail", args=[col.id]) + "?status=bezahlt")
+        self.assertContains(det_paid, "Max Mustermann")
+        self.assertContains(det_paid, "Bezahlt")
+        self.assertNotContains(det_paid, "text-decoration-line-through")
+        self.assertNotContains(det_paid, "Erika Alt")
+
+        # Attended -> Teilgenommen, is_completed remains False
+        self.client.post(reverse("list_kit:entry_confirm", args=[col.id, e1.id]), {"decision": "attended"})
+        e1.refresh_from_db()
+        self.assertEqual(e1.status, "Teilgenommen")
+        self.assertFalse(e1.is_completed)
+
+        # Reject -> Abgesagt, appears with Abgelehnt in ?status=abgesagt
+        self.client.post(reverse("list_kit:entry_confirm", args=[col.id, e1.id]), {"decision": "reject"})
+        e1.refresh_from_db()
+        self.assertEqual(e1.status, "Abgesagt")
+        self.assertFalse(e1.is_completed)
+
+        det_cancel = self.client.get(reverse("list_kit:collection_detail", args=[col.id]) + "?status=abgesagt")
+        self.assertContains(det_cancel, "Max Mustermann")
+        self.assertContains(det_cancel, "Erika Alt")
+
 
 if __name__ == "__main__":
     import unittest

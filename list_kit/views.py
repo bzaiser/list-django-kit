@@ -89,9 +89,52 @@ def collection_detail_view(request, pk):
     if not can_edit:
         entries_qs = entries_qs.filter(visibility="public")
 
-    active_entries = [e for e in entries_qs if not e.is_completed]
-    completed_entries = [e for e in entries_qs if e.is_completed]
+    all_entries = list(entries_qs)
     ui = col.template.get_ui_style()
+    status_filter = (request.GET.get("status") or "all").strip().lower()
+    inbox_tabs = []
+
+    if col.template.content_type == "form_inbox":
+        def _status_bucket(entry_obj):
+            st = (entry_obj.status or "Offen").strip().lower()
+            if st in ("abgesagt", "abgelehnt"):
+                return "abgesagt"
+            if st == "bestätigt":
+                return "bestaetigt"
+            if st == "teilgenommen":
+                return "teilgenommen"
+            return "offen"
+
+        counts = {
+            "all": len(all_entries),
+            "offen": sum(1 for e in all_entries if _status_bucket(e) == "offen"),
+            "bestaetigt": sum(1 for e in all_entries if _status_bucket(e) == "bestaetigt"),
+            "bezahlt": sum(1 for e in all_entries if bool((e.custom_data_json or {}).get("is_paid"))),
+            "teilgenommen": sum(1 for e in all_entries if _status_bucket(e) == "teilgenommen"),
+            "abgesagt": sum(1 for e in all_entries if _status_bucket(e) == "abgesagt"),
+        }
+        inbox_tabs = [
+            {"key": "all", "label": "Alle", "count": counts["all"]},
+            {"key": "offen", "label": "Offen", "count": counts["offen"]},
+            {"key": "bestaetigt", "label": "Bestätigt", "count": counts["bestaetigt"]},
+        ]
+        if col.template.slug in ("kurs-anmeldung", "mitgliedsantrag") or col.template.use_price:
+            inbox_tabs.append({"key": "bezahlt", "label": "Bezahlt", "count": counts["bezahlt"]})
+        if col.template.slug == "kurs-anmeldung":
+            inbox_tabs.append({"key": "teilgenommen", "label": "Teilgenommen", "count": counts["teilgenommen"]})
+        inbox_tabs.append({"key": "abgesagt", "label": "Abgesagt", "count": counts["abgesagt"]})
+
+        if status_filter == "bezahlt":
+            active_entries = [e for e in all_entries if bool((e.custom_data_json or {}).get("is_paid"))]
+        elif status_filter in ("offen", "bestaetigt", "teilgenommen", "abgesagt"):
+            active_entries = [e for e in all_entries if _status_bucket(e) == status_filter]
+        else:
+            status_filter = "all"
+            active_entries = all_entries
+        completed_entries = []
+    else:
+        active_entries = [e for e in all_entries if not e.is_completed]
+        completed_entries = [e for e in all_entries if e.is_completed]
 
     ctx = {
         "collection": col,
@@ -99,6 +142,8 @@ def collection_detail_view(request, pk):
         "can_edit": can_edit,
         "active_entries": active_entries,
         "completed_entries": completed_entries,
+        "status_filter": status_filter,
+        "inbox_tabs": inbox_tabs,
         "ui": ui,
         "statuses": col.template.get_effective_statuses(),
         "custom_fields": col.template.custom_fields_json or [],
@@ -391,25 +436,59 @@ def entry_confirm_view(request, pk, entry_id):
     entry = get_object_or_404(Entry, pk=entry_id, collection=col)
     decision = (request.POST.get("decision") or "confirm").strip().lower()
     note = (request.POST.get("confirm_note") or "").strip()
-    is_confirm = decision != "reject"
+    now_str = timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")
+    username = request.user.get_username()
 
     data = dict(entry.custom_data_json or {})
-    data["confirmed_by"] = request.user.get_username()
-    data["confirmed_at"] = timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")
     if note:
         data["confirm_note"] = note
+
+    send_decision_mail = False
+    subj_state = ""
+
+    if decision == "paid":
+        is_paid = not bool(data.get("is_paid"))
+        data["is_paid"] = is_paid
+        if is_paid:
+            data["paid_by"] = username
+            data["paid_at"] = now_str
+        else:
+            data.pop("paid_by", None)
+            data.pop("paid_at", None)
+        entry.is_completed = False
+        msg = f"Eintrag „{entry.title}“ als {'Bezahlt' if is_paid else 'Nicht bezahlt'} markiert."
+    elif decision == "attended":
+        data["attended_by"] = username
+        data["attended_at"] = now_str
+        entry.status = "Teilgenommen"
+        entry.is_completed = False
+        msg = f"Eintrag „{entry.title}“ als {entry.status} markiert."
+    elif decision == "reject":
+        data["confirmed_by"] = username
+        data["confirmed_at"] = now_str
+        entry.status = "Abgesagt"
+        entry.is_completed = False
+        send_decision_mail = True
+        subj_state = "abgesagt"
+        msg = f"Eintrag „{entry.title}“ als {entry.status} markiert."
+    else:
+        data["confirmed_by"] = username
+        data["confirmed_at"] = now_str
+        entry.status = "Bestätigt"
+        entry.is_completed = False
+        send_decision_mail = True
+        subj_state = "bestätigt"
+        msg = f"Eintrag „{entry.title}“ als {entry.status} markiert."
+
     entry.custom_data_json = data
-    entry.status = "Bestätigt" if is_confirm else "Abgelehnt"
-    entry.is_completed = is_confirm
     entry.save(update_fields=["custom_data_json", "status", "is_completed", "updated_at"])
 
     recipient_email = (data.get("absender_email") or data.get("email") or "").strip()
-    if recipient_email and "@" in recipient_email:
+    if send_decision_mail and recipient_email and "@" in recipient_email:
         try:
             from django.conf import settings as django_settings
             from django.core.mail import send_mail
 
-            subj_state = "bestätigt" if is_confirm else "abgelehnt"
             body = (
                 f"Hallo,\n\nIhre Anfrage „{entry.title}“ ({col.title}) wurde {subj_state}."
                 + (f"\n\nHinweis: {note}" if note else "")
@@ -425,7 +504,7 @@ def entry_confirm_view(request, pk, entry_id):
         except Exception:
             pass
 
-    messages.success(request, f"Eintrag „{entry.title}“ als {entry.status} markiert.")
+    messages.success(request, msg)
     next_url = (request.POST.get("next") or "").strip()
     if next_url and next_url.startswith("/"):
         return redirect(next_url)

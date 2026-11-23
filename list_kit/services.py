@@ -73,6 +73,11 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "description": "Öffentliches Kontakt- oder Antragsformular mit Benachrichtigung.",
             "use_notes": True,
             "use_status": True,
+            "allowed_statuses_json": [
+                {"key": "open", "label": "Offen", "completes": False},
+                {"key": "confirmed", "label": "Bestätigt", "completes": False},
+                {"key": "cancelled", "label": "Abgesagt", "completes": False},
+            ],
             "custom_fields_json": [
                 {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
                 {"key": "absender_email", "label": "E-Mail", "type": "text", "options": "", "zone": "body", "show_on_card": True},
@@ -88,6 +93,12 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "use_notes": True,
             "use_status": True,
             "use_amount": True,
+            "allowed_statuses_json": [
+                {"key": "open", "label": "Offen", "completes": False},
+                {"key": "confirmed", "label": "Bestätigt", "completes": False},
+                {"key": "attended", "label": "Teilgenommen", "completes": False},
+                {"key": "cancelled", "label": "Abgesagt", "completes": False},
+            ],
             "custom_fields_json": [
                 {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
                 {"key": "absender_email", "label": "E-Mail", "type": "email", "options": "", "zone": "body", "show_on_card": True},
@@ -104,6 +115,11 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "description": "Öffentlicher Aufnahmeantrag für neue Mitglieder mit Bestätigung.",
             "use_notes": True,
             "use_status": True,
+            "allowed_statuses_json": [
+                {"key": "open", "label": "Offen", "completes": False},
+                {"key": "confirmed", "label": "Bestätigt", "completes": False},
+                {"key": "cancelled", "label": "Abgesagt", "completes": False},
+            ],
             "custom_fields_json": [
                 {"key": "vorname", "label": "Vorname", "type": "text", "options": "", "zone": "header", "show_on_card": True},
                 {"key": "nachname", "label": "Nachname", "type": "text", "options": "", "zone": "header", "show_on_card": True},
@@ -123,6 +139,11 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "use_notes": True,
             "use_status": True,
             "use_end_date": True,
+            "allowed_statuses_json": [
+                {"key": "open", "label": "Offen", "completes": False},
+                {"key": "confirmed", "label": "Bestätigt", "completes": False},
+                {"key": "cancelled", "label": "Abgesagt", "completes": False},
+            ],
             "custom_fields_json": [
                 {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
                 {"key": "absender_email", "label": "E-Mail", "type": "email", "options": "", "zone": "body", "show_on_card": True},
@@ -138,6 +159,11 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "description": "Anmeldung zum Newsletter mit Bestätigung & Export.",
             "use_notes": False,
             "use_status": True,
+            "allowed_statuses_json": [
+                {"key": "open", "label": "Offen", "completes": False},
+                {"key": "confirmed", "label": "Bestätigt", "completes": False},
+                {"key": "cancelled", "label": "Abgesagt", "completes": False},
+            ],
             "custom_fields_json": [
                 {"key": "absender_name", "label": "Name (optional)", "type": "text", "options": "", "zone": "header", "show_on_card": True},
                 {"key": "absender_email", "label": "E-Mail-Adresse", "type": "email", "options": "", "zone": "header", "show_on_card": True},
