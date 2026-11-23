@@ -9,6 +9,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import get_template
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
@@ -425,6 +426,9 @@ def entry_confirm_view(request, pk, entry_id):
             pass
 
     messages.success(request, f"Eintrag „{entry.title}“ als {entry.status} markiert.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url and next_url.startswith("/"):
+        return redirect(next_url)
     return redirect("list_kit:collection_detail", pk=col.id)
 
 
