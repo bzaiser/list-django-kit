@@ -1,4 +1,10 @@
-from .models import ListTemplate
+import html
+import re
+
+from django.db.models import Q
+from django.utils import timezone
+
+from .models import Entry, ListTemplate
 
 
 FIELD_DEFS = [
@@ -58,6 +64,20 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             ],
             "is_system": True,
         },
+        {
+            "slug": "kontakt-anfragen",
+            "name": "Kontakt & Anfragen",
+            "icon": "bi-inbox",
+            "content_type": "form_inbox",
+            "description": "Öffentliches Kontakt- oder Antragsformular mit Benachrichtigung.",
+            "use_notes": True,
+            "use_status": True,
+            "custom_fields_json": [
+                {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "absender_email", "label": "E-Mail", "type": "text", "options": "", "zone": "body", "show_on_card": True},
+            ],
+            "is_system": True,
+        },
     ]
     created_or_existing = []
     for item in defaults:
@@ -66,3 +86,101 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
         obj, _ = ListTemplate.objects.using(db_alias).get_or_create(slug=slug, defaults=defaults_dict)
         created_or_existing.append(obj)
     return created_or_existing
+
+
+def render_safe_markdown(text: str) -> str:
+    """Render minimal, XSS-safe Markdown (headings, bold, italic, links, lists, paragraphs)."""
+    if not text:
+        return ""
+    escaped = html.escape(text, quote=True)
+
+    def _inline(line: str) -> str:
+        line = re.sub(
+            r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+            r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
+            line,
+        )
+        line = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", line)
+        line = re.sub(r"\*([^*]+)\*", r"<em>\1</em>", line)
+        return line
+
+    out = []
+    in_list = False
+    for raw_line in escaped.splitlines():
+        line = raw_line.strip()
+        if not line:
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            continue
+        if line.startswith("### "):
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            out.append(f'<h5 class="fw-bold mt-3 mb-2">{_inline(line[4:])}</h5>')
+        elif line.startswith("## "):
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            out.append(f'<h4 class="fw-bold mt-3 mb-2">{_inline(line[3:])}</h4>')
+        elif line.startswith("- ") or line.startswith("* "):
+            if not in_list:
+                out.append('<ul class="mb-2">')
+                in_list = True
+            out.append(f"<li>{_inline(line[2:])}</li>")
+        else:
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            out.append(f'<p class="mb-2">{_inline(line)}</p>')
+    if in_list:
+        out.append("</ul>")
+    return "\n".join(out)
+
+
+def get_published_entries(content_type: str | None = None, collection_slug: str | None = None, limit: int | None = None):
+    """Return currently published public Entry objects across public collections."""
+    now = timezone.now()
+    qs = (
+        Entry.objects.select_related("collection", "collection__template", "created_by")
+        .filter(collection__is_public=True, visibility="public")
+        .filter(Q(publish_at__isnull=True) | Q(publish_at__lte=now))
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+    )
+    if content_type:
+        qs = qs.filter(collection__template__content_type=content_type)
+    if collection_slug:
+        qs = qs.filter(collection__slug=collection_slug)
+    qs = qs.order_by("-is_pinned", "-publish_at", "-created_at")
+    if limit is not None:
+        return list(qs[:limit])
+    return list(qs)
+
+
+def notify_staff_submission(collection, entry) -> None:
+    """Notify collection owner and staff via notify_kit when a public form is submitted."""
+    try:
+        from django.contrib.auth import get_user_model
+        from notify_kit.services import notify
+    except Exception:
+        return
+
+    User = get_user_model()
+    recipients = set()
+    if collection.owner_id:
+        recipients.add(collection.owner)
+    for u in User.objects.filter(is_active=True, is_staff=True):
+        recipients.add(u)
+
+    for u in recipients:
+        try:
+            notify(
+                user=u,
+                title=f"Neuer Eingang: {entry.title}",
+                message=f"Über Formular „{collection.title}“ eingereicht.",
+                level="info",
+                link=f"/lists/{collection.id}/",
+                topic="list_kit.submission",
+            )
+        except Exception:
+            pass

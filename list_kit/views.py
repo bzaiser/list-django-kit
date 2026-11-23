@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from .models import Collection, Entry, ListTemplate
-from .services import FIELD_DEFS, seed_default_templates
+from .services import FIELD_DEFS, notify_staff_submission, seed_default_templates
 
 
 def _user_can_access_collection(user, collection: Collection, write: bool = False) -> bool:
@@ -234,6 +234,49 @@ def entry_delete_view(request, pk, entry_id):
     return redirect("list_kit:collection_detail", pk=col.id)
 
 
+@require_POST
+def public_submit_view(request, pk):
+    col = get_object_or_404(Collection.objects.select_related("template", "owner"), pk=pk)
+    if not (col.is_public and col.allow_public_submit):
+        return HttpResponseForbidden("Öffentliche Einreichung nicht aktiviert.")
+
+    title = (request.POST.get("title") or "").strip()
+    if not title:
+        messages.error(request, "Bitte einen Betreff / Titel angeben.")
+        next_url = (request.POST.get("next") or "").strip()
+        return redirect(next_url or "list_kit:collection_detail", pk=col.id) if not next_url else redirect(next_url)
+
+    custom_data = {}
+    for cf in (col.template.custom_fields_json or []):
+        key = cf.get("key")
+        if not key:
+            continue
+        ftype = cf.get("type", "text")
+        form_key = f"custom_{key}"
+        if ftype == "checkbox":
+            custom_data[key] = request.POST.get(form_key) == "on"
+        elif ftype == "multiselect":
+            custom_data[key] = [v.strip() for v in request.POST.getlist(form_key) if v.strip()]
+        else:
+            custom_data[key] = (request.POST.get(form_key) or "").strip()
+
+    entry = Entry.objects.create(
+        collection=col,
+        title=title[:255],
+        notes=(request.POST.get("notes") or "").strip(),
+        status="open",
+        visibility="draft",
+        custom_data_json=custom_data,
+        created_by=request.user if request.user.is_authenticated else None,
+    )
+    notify_staff_submission(col, entry)
+    messages.success(request, "Vielen Dank! Deine Anfrage wurde übermittelt.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url and next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect("list_kit:collection_detail", pk=col.id)
+
+
 @staff_member_required
 def builder_list_view(request):
     seed_default_templates()
@@ -287,7 +330,7 @@ def builder_edit_view(request, pk=None):
         cf_zones = request.POST.getlist("cf_zone")
         cf_show_cards = request.POST.getlist("cf_show_card")
         allowed_cf_types = (
-            "text", "textarea", "number", "currency", "date", "url",
+            "text", "textarea", "markdown", "number", "currency", "date", "url",
             "image", "select", "radio", "multiselect", "checkbox", "rating", "color",
         )
         custom_fields = []

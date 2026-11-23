@@ -164,6 +164,47 @@ class ListKitTests(TestCase):
         self.assertContains(detail, "Frank Schätzing")
         self.assertNotContains(detail, "Geheim123")
 
+    def test_markdown_publishing_window_and_public_submit(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from list_kit.services import get_published_entries, render_safe_markdown
+
+        html = render_safe_markdown("## Titel\n**Fett** <script>alert(1)</script>\n- Punkt 1\n[Link](https://example.com)")
+        self.assertIn("<h4", html)
+        self.assertIn("<strong>Fett</strong>", html)
+        self.assertNotIn("<script>", html)
+        self.assertIn("https://example.com", html)
+
+        tpls = seed_default_templates()
+        self.assertIn("kontakt-anfragen", {t.slug for t in tpls})
+
+        news_tpl = ListTemplate.objects.get(slug="news-aktuelles")
+        news_col = Collection.objects.create(title="News", template=news_tpl, owner=self.staff, is_public=True)
+        now = timezone.now()
+        pub = Entry.objects.create(collection=news_col, title="Aktiv", visibility="public", publish_at=now - timedelta(hours=1))
+        Entry.objects.create(collection=news_col, title="Zukunft", visibility="public", publish_at=now + timedelta(days=1))
+        Entry.objects.create(collection=news_col, title="Abgelaufen", visibility="public", expires_at=now - timedelta(minutes=5))
+        Entry.objects.create(collection=news_col, title="Entwurf", visibility="draft")
+
+        published = get_published_entries(content_type="news")
+        self.assertEqual([e.id for e in published], [pub.id])
+        self.assertTrue(pub.slug)
+
+        form_tpl = ListTemplate.objects.get(slug="kontakt-anfragen")
+        form_col = Collection.objects.create(title="Kontakt", template=form_tpl, owner=self.staff, is_public=True, allow_public_submit=True)
+        anon = Client()
+        sub_resp = anon.post(reverse("list_kit:public_submit", args=[form_col.id]), {
+            "title": "Mitgliedsanfrage",
+            "notes": "Ich möchte beitreten.",
+            "custom_absender_name": "Max",
+            "custom_absender_email": "max@example.com",
+            "next": "/lists/",
+        })
+        self.assertEqual(sub_resp.status_code, 302)
+        created = Entry.objects.get(collection=form_col, title="Mitgliedsanfrage")
+        self.assertEqual(created.visibility, "draft")
+        self.assertEqual(created.custom_data_json.get("absender_name"), "Max")
+
 
 if __name__ == "__main__":
     import unittest

@@ -126,8 +126,10 @@ class Entry(models.Model):
     status = models.CharField(max_length=40, default="open")
     is_completed = models.BooleanField(default=False)
     visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default="internal")
+    slug = models.SlugField(max_length=260, blank=True, default="")
     is_pinned = models.BooleanField(default=False)
     publish_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
@@ -154,6 +156,28 @@ class Entry(models.Model):
 
     class Meta:
         ordering = ["-is_pinned", "is_completed", "position", "-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.title)[:240] or "entry"
+            cand = base
+            idx = 2
+            while Entry.objects.filter(collection=self.collection, slug=cand).exclude(pk=self.pk).exists():
+                cand = f"{base[:230]}-{idx}"
+                idx += 1
+            self.slug = cand
+        super().save(*args, **kwargs)
+
+    def is_currently_published(self) -> bool:
+        if self.visibility != "public":
+            return False
+        from django.utils import timezone
+        now = timezone.now()
+        if self.publish_at and self.publish_at > now:
+            return False
+        if self.expires_at and self.expires_at <= now:
+            return False
+        return True
 
     def get_custom_field_display(self) -> list[dict]:
         fields = getattr(self.collection.template, "custom_fields_json", None) or []
