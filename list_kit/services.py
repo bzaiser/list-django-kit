@@ -79,6 +79,72 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             ],
             "is_system": True,
         },
+        {
+            "slug": "kurs-anmeldung",
+            "name": "Kurs- & Veranstaltungsanmeldung",
+            "icon": "bi-calendar-check",
+            "content_type": "form_inbox",
+            "description": "Online-Anmeldung für Kurse & Veranstaltungen mit Bestätigung durch Verantwortliche.",
+            "use_notes": True,
+            "use_status": True,
+            "use_amount": True,
+            "custom_fields_json": [
+                {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "absender_email", "label": "E-Mail", "type": "email", "options": "", "zone": "body", "show_on_card": True},
+                {"key": "telefon", "label": "Telefon", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "kurs_termin", "label": "Kurs / Veranstaltung", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+            ],
+            "is_system": True,
+        },
+        {
+            "slug": "mitgliedsantrag",
+            "name": "Mitgliedsantrag",
+            "icon": "bi-person-plus",
+            "content_type": "form_inbox",
+            "description": "Öffentlicher Aufnahmeantrag für neue Mitglieder mit Bestätigung.",
+            "use_notes": True,
+            "use_status": True,
+            "custom_fields_json": [
+                {"key": "vorname", "label": "Vorname", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "nachname", "label": "Nachname", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "absender_email", "label": "E-Mail", "type": "email", "options": "", "zone": "body", "show_on_card": True},
+                {"key": "telefon", "label": "Telefon", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "strasse", "label": "Straße & Hausnummer", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "plz_ort", "label": "PLZ / Ort", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+            ],
+            "is_system": True,
+        },
+        {
+            "slug": "kuendigung",
+            "name": "Kündigung / Abmeldung",
+            "icon": "bi-person-dash",
+            "content_type": "form_inbox",
+            "description": "Kündigung der Mitgliedschaft oder Abmeldung mit Bestätigung.",
+            "use_notes": True,
+            "use_status": True,
+            "use_end_date": True,
+            "custom_fields_json": [
+                {"key": "absender_name", "label": "Name", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "absender_email", "label": "E-Mail", "type": "email", "options": "", "zone": "body", "show_on_card": True},
+                {"key": "wunschdatum", "label": "Kündigung zum", "type": "date", "options": "", "zone": "body", "show_on_card": True},
+            ],
+            "is_system": True,
+        },
+        {
+            "slug": "newsletter-abo",
+            "name": "Newsletter-Abo",
+            "icon": "bi-envelope-check",
+            "content_type": "form_inbox",
+            "description": "Anmeldung zum Newsletter mit Bestätigung & Export.",
+            "use_notes": False,
+            "use_status": True,
+            "custom_fields_json": [
+                {"key": "absender_name", "label": "Name (optional)", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "absender_email", "label": "E-Mail-Adresse", "type": "email", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "themen", "label": "Interessen / Themen", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+            ],
+            "is_system": True,
+        },
     ]
     created_or_existing = []
     for item in defaults:
@@ -168,6 +234,8 @@ def notify_staff_submission(collection, entry) -> None:
 
     User = get_user_model()
     recipients = set()
+    if getattr(collection, "responsible_user_id", None):
+        recipients.add(collection.responsible_user)
     if collection.owner_id:
         recipients.add(collection.owner)
     for u in User.objects.filter(is_active=True, is_staff=True):

@@ -90,6 +90,13 @@ class Collection(models.Model):
         on_delete=models.CASCADE,
         related_name="list_kit_collections",
     )
+    responsible_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="list_kit_responsible_collections",
+    )
     shared_with = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,

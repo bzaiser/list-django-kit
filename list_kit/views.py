@@ -19,9 +19,11 @@ from .services import FIELD_DEFS, notify_staff_submission, seed_default_template
 
 def _user_can_access_collection(user, collection: Collection, write: bool = False) -> bool:
     if user and user.is_authenticated:
-        if user.is_superuser or collection.owner_id == user.id:
+        if user.is_superuser or collection.owner_id == user.id or collection.responsible_user_id == user.id:
             return True
         if collection.shared_with.filter(pk=user.pk).exists():
+            return True
+        if collection.is_public and user.groups.filter(name__in=("Redakteur", "Leitung / Vorstand", "Vorstand")).exists():
             return True
     if not write and collection.is_public:
         return True
@@ -31,7 +33,10 @@ def _user_can_access_collection(user, collection: Collection, write: bool = Fals
 def _user_allowed_collections(user):
     if user.is_superuser:
         return Collection.objects.all()
-    return Collection.objects.filter(Q(owner=user) | Q(shared_with=user)).distinct()
+    q = Q(owner=user) | Q(responsible_user=user) | Q(shared_with=user)
+    if user.groups.filter(name__in=("Redakteur", "Leitung / Vorstand", "Vorstand")).exists():
+        q |= Q(is_public=True)
+    return Collection.objects.filter(q).distinct()
 
 
 @login_required
@@ -355,6 +360,10 @@ def public_submit_view(request, pk):
         else:
             custom_data[key] = (request.POST.get(form_key) or "").strip()
 
+    event_id = (request.POST.get("event_id") or "").strip()
+    if event_id.isdigit():
+        custom_data["event_id"] = event_id
+
     entry = Entry.objects.create(
         collection=col,
         title=title[:255],
@@ -370,6 +379,134 @@ def public_submit_view(request, pk):
     if next_url and next_url.startswith("/"):
         return redirect(next_url)
     return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+@require_POST
+def entry_confirm_view(request, pk, entry_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    decision = (request.POST.get("decision") or "confirm").strip().lower()
+    note = (request.POST.get("confirm_note") or "").strip()
+    is_confirm = decision != "reject"
+
+    data = dict(entry.custom_data_json or {})
+    data["confirmed_by"] = request.user.get_username()
+    data["confirmed_at"] = timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")
+    if note:
+        data["confirm_note"] = note
+    entry.custom_data_json = data
+    entry.status = "Bestätigt" if is_confirm else "Abgelehnt"
+    entry.is_completed = is_confirm
+    entry.save(update_fields=["custom_data_json", "status", "is_completed", "updated_at"])
+
+    recipient_email = (data.get("absender_email") or data.get("email") or "").strip()
+    if recipient_email and "@" in recipient_email:
+        try:
+            from django.conf import settings as django_settings
+            from django.core.mail import send_mail
+
+            subj_state = "bestätigt" if is_confirm else "abgelehnt"
+            body = (
+                f"Hallo,\n\nIhre Anfrage „{entry.title}“ ({col.title}) wurde {subj_state}."
+                + (f"\n\nHinweis: {note}" if note else "")
+                + "\n"
+            )
+            send_mail(
+                subject=f"{col.title}: {entry.title} ({subj_state})",
+                message=body,
+                from_email=getattr(django_settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost",
+                recipient_list=[recipient_email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    messages.success(request, f"Eintrag „{entry.title}“ als {entry.status} markiert.")
+    return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+@require_POST
+def entry_create_person_view(request, pk, entry_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    try:
+        from domain_kit.models import Address, Person
+    except Exception:
+        messages.error(request, "domain_kit ist nicht installiert.")
+        return redirect("list_kit:collection_detail", pk=col.id)
+
+    data = dict(entry.custom_data_json or {})
+    first = (data.get("vorname") or "").strip()
+    last = (data.get("nachname") or "").strip()
+    if not first and data.get("absender_name"):
+        parts = str(data["absender_name"]).strip().split(" ", 1)
+        first = parts[0]
+        last = parts[1] if len(parts) > 1 else ""
+    first = (first or entry.title or "Neu")[:80]
+    email = (data.get("absender_email") or data.get("email") or "").strip()[:140]
+    phone = (data.get("telefon") or "").strip()[:60]
+    person = Person.objects.create(
+        first_name=first,
+        last_name=last[:80],
+        display_name=f"{first} {last}".strip()[:140],
+        email=email,
+        phone=phone,
+        notes=f"Übernommen aus {col.title}: {entry.title}",
+    )
+    street = (data.get("strasse") or "").strip()[:140]
+    plz_ort = (data.get("plz_ort") or "").strip()
+    if street or plz_ort:
+        plz, city = "", plz_ort
+        parts = plz_ort.split(" ", 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            plz, city = parts[0][:24], parts[1][:80]
+        Address.objects.create(
+            person=person,
+            label="Hauptadresse",
+            street=street,
+            postal_code=plz,
+            city=city[:80],
+            is_primary=True,
+        )
+    data["created_person_id"] = person.id
+    entry.custom_data_json = data
+    entry.save(update_fields=["custom_data_json", "updated_at"])
+    messages.success(request, f"Person „{person.full_name}“ in domain_kit angelegt.")
+    return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+def collection_export_csv_view(request, pk):
+    import csv
+
+    col = get_object_or_404(Collection.objects.select_related("template"), pk=pk)
+    if not _user_can_access_collection(request.user, col, write=False):
+        return HttpResponseForbidden()
+    qs = col.entries.all().order_by("-created_at")
+    status_filter = (request.GET.get("status") or "").strip()
+    if status_filter:
+        qs = qs.filter(status__iexact=status_filter)
+
+    cf_keys = [cf.get("key") for cf in (col.template.custom_fields_json or []) if cf.get("key")]
+    resp = HttpResponse(content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="{col.slug or col.id}.csv"'
+    resp.write("\ufeff")
+    writer = csv.writer(resp, delimiter=";")
+    writer.writerow(["Titel", "Status", "Erstellt"] + cf_keys + ["Notizen"])
+    for e in qs:
+        data = e.custom_data_json if isinstance(e.custom_data_json, dict) else {}
+        writer.writerow(
+            [e.title, e.status, e.created_at.strftime("%Y-%m-%d %H:%M")]
+            + [data.get(k, "") for k in cf_keys]
+            + [e.notes]
+        )
+    return resp
 
 
 @staff_member_required
