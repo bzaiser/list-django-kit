@@ -303,6 +303,12 @@ def entry_save_view(request, pk, entry_id=None):
         entry.location = (request.POST.get("location") or "").strip()[:160]
     if tpl.use_image:
         entry.image_url = (request.POST.get("image_url") or "").strip()[:200]
+    if tpl.use_cover_image:
+        if request.POST.get("remove_cover_image") == "1" and entry.cover_image:
+            entry.cover_image.delete(save=False)
+            entry.cover_image = None
+        if "cover_image" in request.FILES:
+            entry.cover_image = request.FILES["cover_image"]
     if tpl.use_category or tpl.use_master_status or tpl.use_person or tpl.use_document:
         md = get_domain_masterdata_choices(tpl.content_type, public_only=col.is_public)
         if tpl.use_category:
@@ -538,6 +544,13 @@ def entry_duplicate_view(request, pk, entry_id):
         position=src.position,
         created_by=request.user,
     )
+    if src.cover_image:
+        try:
+            with src.cover_image.open("rb") as fh:
+                name = (src.cover_image.name or "cover.jpg").rsplit("/", 1)[-1]
+                dup.cover_image.save(name, ContentFile(fh.read()), save=True)
+        except Exception:
+            pass
     for img in src.images.all():
         try:
             with img.image.open("rb") as fh:
@@ -905,9 +918,21 @@ def builder_edit_view(request, pk=None):
             "footer_text": (request.POST.get("pdf_footer_text") or "").strip()[:160],
         }
 
+        c_pos = request.POST.get("ui_cover_position", "left")
+        c_shape = request.POST.get("ui_cover_shape", "rounded")
+        c_aspect = request.POST.get("ui_cover_aspect", "auto")
+        c_size = request.POST.get("ui_cover_size", "md")
+        cover_cfg = {
+            "position": c_pos if c_pos in ("left", "right", "top", "bottom") else "left",
+            "shape": c_shape if c_shape in ("rounded", "square", "circle") else "rounded",
+            "aspect": c_aspect if c_aspect in ("auto", "landscape", "portrait", "square") else "auto",
+            "size": c_size if c_size in ("sm", "md", "lg") else "md",
+        }
+
         tpl.ui_style_json = {
             "layout_mode": layout_mode,
             "card_width": card_width,
+            "cover_image": cover_cfg,
             "density": density,
             "show_creator": request.POST.get("ui_show_creator") == "on",
             "genre": genre,
