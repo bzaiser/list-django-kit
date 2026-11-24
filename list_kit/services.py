@@ -20,6 +20,10 @@ FIELD_DEFS = [
     {"key": "use_image", "label": "Fotos / Bildanhang", "icon": "bi-images", "desc": "Bild-URL oder Mehrfach-Foto-Upload", "default_zone": "body"},
     {"key": "use_image_checklist", "label": "Fotos einzeln abhakbar", "icon": "bi-check2-square", "desc": "Hochgeladene Fotos mit Textzeile abhaken", "default_zone": "body"},
     {"key": "use_location", "label": "Ort / Raum", "icon": "bi-geo-alt", "desc": "Ortsangabe", "default_zone": "body"},
+    {"key": "use_category", "label": "Kategorie (Stammdaten)", "icon": "bi-folder2-open", "desc": "Vorgefilterte Kategorie aus domain_kit", "default_zone": "header"},
+    {"key": "use_master_status", "label": "Status (Stammdaten)", "icon": "bi-bookmark-check", "desc": "Zentraler Status aus domain_kit", "default_zone": "header"},
+    {"key": "use_person", "label": "Person / Kontakt", "icon": "bi-person-badge", "desc": "Verknüpfung zu Person aus domain_kit", "default_zone": "body"},
+    {"key": "use_document", "label": "Dokumente / Downloads", "icon": "bi-file-earmark-arrow-down", "desc": "Datei-Upload oder öffentliches Dokument zum Download", "default_zone": "footer"},
 ]
 
 
@@ -277,6 +281,87 @@ def get_archived_entries(content_type: str | None = "news", year: int | None = N
     if limit is not None:
         return list(qs[:limit])
     return list(qs)
+
+
+def get_domain_masterdata_choices(content_type: str = "list", public_only: bool = False) -> dict:
+    """Safely load master data choices from domain_kit when installed."""
+    res = {"categories": [], "statuses": [], "persons": [], "documents": []}
+    try:
+        from django.apps import apps
+        if not apps.is_installed("domain_kit"):
+            return res
+        from domain_kit.models import Category, Document, Person, Status
+    except Exception:
+        return res
+
+    purpose_map = {
+        "news": ["news", "general", "all", ""],
+        "inventory": ["inventory", "asset", "general", "all", ""],
+        "contact": ["person", "contact", "general", "all", ""],
+        "photo_gallery": ["gallery", "media", "news", "general", "all", ""],
+    }
+    allowed_purposes = purpose_map.get(content_type, [content_type, "general", "all", ""])
+    try:
+        cat_qs = Category.objects.all()
+        if hasattr(Category, "is_active"):
+            cat_qs = cat_qs.filter(is_active=True)
+        filtered_cats = list(cat_qs.filter(purpose__in=allowed_purposes).order_by("name"))
+        if not filtered_cats:
+            filtered_cats = list(cat_qs.order_by("name"))
+        res["categories"] = [{"id": c.id, "name": c.name} for c in filtered_cats]
+    except Exception:
+        pass
+
+    try:
+        st_qs = Status.objects.all()
+        if hasattr(Status, "is_active"):
+            st_qs = st_qs.filter(is_active=True)
+        res["statuses"] = [{"id": s.id, "name": s.name} for s in st_qs.order_by("name")]
+    except Exception:
+        pass
+
+    try:
+        p_qs = Person.objects.all()
+        if hasattr(Person, "is_active"):
+            p_qs = p_qs.filter(is_active=True)
+        if public_only and hasattr(Person, "is_public"):
+            p_qs = p_qs.filter(is_public=True)
+        res["persons"] = [{"id": p.id, "name": p.full_name} for p in p_qs.order_by("last_name", "first_name")[:200]]
+    except Exception:
+        pass
+
+    try:
+        d_qs = Document.objects.exclude(file="").exclude(file__isnull=True)
+        if public_only:
+            d_qs = d_qs.filter(is_public=True)
+        res["documents"] = [
+            {"id": d.id, "title": d.title, "is_public": bool(getattr(d, "is_public", False))}
+            for d in d_qs.order_by("-created_at")[:150]
+        ]
+    except Exception:
+        pass
+
+    return res
+
+
+def get_linked_domain_document(doc_id, require_public: bool = False) -> dict | None:
+    """Resolve a linked domain_kit.Document into a safe download dict."""
+    if not doc_id:
+        return None
+    try:
+        from django.apps import apps
+        if not apps.is_installed("domain_kit"):
+            return None
+        from domain_kit.models import Document
+        qs = Document.objects.filter(pk=int(doc_id))
+        if require_public:
+            qs = qs.filter(is_public=True)
+        doc = qs.first()
+        if not doc or not doc.file:
+            return None
+        return {"id": doc.id, "title": doc.title, "url": doc.file.url, "is_public": bool(doc.is_public)}
+    except Exception:
+        return None
 
 
 def get_gallery_photos(collection_slug: str | None = None, limit: int = 60) -> list[dict]:

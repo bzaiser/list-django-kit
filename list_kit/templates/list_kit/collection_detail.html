@@ -309,17 +309,9 @@
                     <div id="lk-new-images-preview" class="d-flex flex-column gap-2"></div>
                 </div>
                 {% endif %}
+                {% include "list_kit/partials/_masterdata_inputs.html" with entry=None %}
                 {% for cf in custom_fields %}
-                <div>
-                    <label class="form-label fw-semibold">{{ cf.label }}</label>
-                    {% if cf.type == 'textarea' %}
-                    <textarea name="custom_{{ cf.key }}" rows="2" class="form-control"></textarea>
-                    {% elif cf.type == 'checkbox' %}
-                    <div class="form-check"><input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input"></div>
-                    {% else %}
-                    <input type="text" name="custom_{{ cf.key }}" class="form-control">
-                    {% endif %}
-                </div>
+                {% include "list_kit/partials/_custom_field_input.html" with modal_prefix="new" %}
                 {% endfor %}
             </div>
             <div class="modal-footer">
@@ -426,17 +418,9 @@
                     </div>
                 </div>
                 {% endif %}
+                {% include "list_kit/partials/_masterdata_inputs.html" %}
                 {% for cf in entry.edit_custom_fields %}
-                <div>
-                    <label class="form-label fw-semibold">{{ cf.label }}</label>
-                    {% if cf.type == 'textarea' %}
-                    <textarea name="custom_{{ cf.key }}" rows="2" class="form-control">{{ cf.value }}</textarea>
-                    {% elif cf.type == 'checkbox' %}
-                    <div class="form-check"><input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input" {% if cf.value %}checked{% endif %}></div>
-                    {% else %}
-                    <input type="text" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value }}">
-                    {% endif %}
-                </div>
+                {% include "list_kit/partials/_custom_field_input.html" with modal_prefix=entry.id %}
                 {% endfor %}
             </div>
             <div class="modal-footer">

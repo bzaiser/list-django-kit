@@ -1,0 +1,94 @@
+{% if template.use_category or template.use_master_status or template.use_person %}
+<div class="row g-2">
+    {% if template.use_category %}
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">Kategorie (Stammdaten)</label>
+        {% if masterdata.categories %}
+        <select name="category_id" class="form-select">
+            <option value="">— Keine —</option>
+            {% for c in masterdata.categories %}
+            <option value="{{ c.id }}" {% if entry and entry.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="category_label" class="form-control" value="{% if entry %}{{ entry.category_label }}{% endif %}" placeholder="Kategorie">
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if template.use_master_status %}
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">Status (Stammdaten)</label>
+        {% if masterdata.statuses %}
+        <select name="master_status_id" class="form-select">
+            <option value="">— Keiner —</option>
+            {% for s in masterdata.statuses %}
+            <option value="{{ s.id }}" {% if entry and entry.master_status_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="master_status_label" class="form-control" value="{% if entry %}{{ entry.master_status_label }}{% endif %}" placeholder="Status">
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if template.use_person %}
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">Person / Kontakt</label>
+        {% if masterdata.persons %}
+        <select name="person_id" class="form-select">
+            <option value="">— Keine —</option>
+            {% for p in masterdata.persons %}
+            <option value="{{ p.id }}" {% if entry and entry.person_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="person_label" class="form-control" value="{% if entry %}{{ entry.person_label }}{% endif %}" placeholder="Name">
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if template.use_document %}
+<div class="border rounded-3 p-3 bg-body-tertiary d-flex flex-column gap-2">
+    <label class="form-label fw-semibold mb-0"><i class="bi bi-file-earmark-arrow-down me-1"></i>Dokumente / Downloads</label>
+    {% if masterdata.documents %}
+    <div>
+        <label class="form-label small text-muted mb-1">Verknüpftes Dokument (domain_kit{% if collection.is_public %}, nur öffentliche{% endif %})</label>
+        <select name="linked_document_id" class="form-select form-select-sm">
+            <option value="">— Keines —</option>
+            {% for d in masterdata.documents %}
+            <option value="{{ d.id }}" {% if entry and entry.linked_document_id == d.id %}selected{% endif %}>{{ d.title }}{% if d.is_public %} (öffentlich){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    {% if entry %}
+    {% with docs=entry.documents.all %}
+    {% if docs %}
+    <div class="d-flex flex-column gap-1">
+        {% for doc in docs %}
+        <div class="d-flex align-items-center justify-content-between gap-2 border rounded-2 p-2 bg-body">
+            <input type="hidden" name="existing_document_present_{{ doc.id }}" value="1">
+            <a href="{{ doc.file.url }}" download class="small text-truncate text-decoration-none"><i class="bi bi-file-earmark-text me-1"></i>{{ doc.filename }}</a>
+            <div class="d-flex align-items-center gap-3 flex-shrink-0">
+                <div class="form-check mb-0">
+                    <input type="checkbox" name="existing_document_public_{{ doc.id }}" id="pubDoc-{{ entry.id }}-{{ doc.id }}" class="form-check-input" {% if doc.is_public %}checked{% endif %}>
+                    <label class="form-check-label small" for="pubDoc-{{ entry.id }}-{{ doc.id }}">Öffentlich</label>
+                </div>
+                <div class="form-check mb-0">
+                    <input type="checkbox" name="delete_document_ids" value="{{ doc.id }}" id="delDoc-{{ entry.id }}-{{ doc.id }}" class="form-check-input">
+                    <label class="form-check-label small text-danger" for="delDoc-{{ entry.id }}-{{ doc.id }}" title="Löschen"><i class="bi bi-trash3"></i></label>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+    <div>
+        <label class="form-label small text-muted mb-1">Dateien zum Download hochladen</label>
+        <input type="file" name="documents" multiple class="form-control form-control-sm">
+    </div>
+</div>
+{% endif %}

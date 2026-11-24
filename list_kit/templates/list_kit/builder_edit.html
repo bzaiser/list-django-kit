@@ -291,27 +291,45 @@
     function renderCustomFields() {
         const box = document.getElementById('lk-cf-list');
         box.innerHTML = '';
+        const typeChoices = [
+            ['text', 'Text (einzeilig)'],
+            ['textarea', 'Mehrzeilig'],
+            ['markdown', 'Markdown'],
+            ['select', 'Dropdown (Auswahl)'],
+            ['multiselect', 'Mehrfachauswahl'],
+            ['radio', 'Radio-Buttons'],
+            ['checkbox', 'Ja/Nein'],
+            ['number', 'Zahl'],
+            ['currency', 'Betrag (€)'],
+            ['date', 'Datum'],
+            ['url', 'Link / URL'],
+            ['rating', 'Bewertung (1–5)'],
+            ['color', 'Farbe'],
+        ];
         customFields.forEach((cf, idx) => {
             const wrap = document.createElement('div');
             wrap.className = 'border rounded-3 p-2 bg-body-tertiary d-flex flex-column gap-1';
+            const needsOpts = ['select', 'radio', 'multiselect'].includes(cf.type || 'text');
+            const optsHtml = typeChoices.map(tc =>
+                '<option value="' + tc[0] + '"' + ((cf.type || 'text') === tc[0] ? ' selected' : '') + '>' + tc[1] + '</option>'
+            ).join('');
             wrap.innerHTML =
                 '<div class="d-flex gap-1">' +
                 '<input type="text" name="cf_label" class="form-control form-control-sm" placeholder="Feldname" value="' + (cf.label || '').replace(/"/g, '&quot;') + '">' +
                 '<input type="hidden" name="cf_key" value="' + (cf.key || '') + '">' +
                 '<input type="hidden" name="cf_zone" value="' + (cf.zone || 'body') + '">' +
                 '<input type="hidden" name="cf_show_card" value="' + (cf.show_on_card === false ? '0' : '1') + '">' +
-                '<input type="hidden" name="cf_options" value="' + (cf.options || '').replace(/"/g, '&quot;') + '">' +
-                '<select name="cf_type" class="form-select form-select-sm w-auto">' +
-                '<option value="text"' + (cf.type === 'text' ? ' selected' : '') + '>Text</option>' +
-                '<option value="textarea"' + (cf.type === 'textarea' ? ' selected' : '') + '>Mehrzeilig</option>' +
-                '<option value="number"' + (cf.type === 'number' ? ' selected' : '') + '>Zahl</option>' +
-                '<option value="date"' + (cf.type === 'date' ? ' selected' : '') + '>Datum</option>' +
-                '<option value="checkbox"' + (cf.type === 'checkbox' ? ' selected' : '') + '>Ja/Nein</option>' +
-                '</select>' +
+                '<select name="cf_type" class="form-select form-select-sm w-auto">' + optsHtml + '</select>' +
                 '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 lk-del-cf">&times;</button>' +
-                '</div>';
+                '</div>' +
+                '<input type="text" name="cf_options" class="form-control form-control-sm mt-1' + (needsOpts ? '' : ' d-none') + '" placeholder="Optionen kommagetrennt (z. B. Allgemein, Ausstellung, Kurs)" value="' + (cf.options || '').replace(/"/g, '&quot;') + '">';
             wrap.querySelector('input[name="cf_label"]').oninput = function (e) { cf.label = e.target.value; renderZones(); };
-            wrap.querySelector('select[name="cf_type"]').onchange = function (e) { cf.type = e.target.value; };
+            const optInp = wrap.querySelector('input[name="cf_options"]');
+            optInp.oninput = function (e) { cf.options = e.target.value; };
+            wrap.querySelector('select[name="cf_type"]').onchange = function (e) {
+                cf.type = e.target.value;
+                optInp.classList.toggle('d-none', !['select', 'radio', 'multiselect'].includes(cf.type));
+            };
             wrap.querySelector('.lk-del-cf').onclick = function () {
                 const fid = 'cf:' + cf.key;
                 ['header', 'body', 'footer', 'hidden'].forEach(k => { cardLayout[k] = cardLayout[k].filter(x => x !== fid); });

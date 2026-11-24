@@ -31,6 +31,10 @@ class ListTemplate(models.Model):
     use_image = models.BooleanField(default=False)
     use_image_checklist = models.BooleanField(default=False)
     use_location = models.BooleanField(default=False)
+    use_category = models.BooleanField(default=False)
+    use_master_status = models.BooleanField(default=False)
+    use_person = models.BooleanField(default=False)
+    use_document = models.BooleanField(default=False)
 
     custom_fields_json = models.JSONField(default=list, blank=True)
     allowed_statuses_json = models.JSONField(default=list, blank=True)
@@ -149,6 +153,13 @@ class Entry(models.Model):
     url = models.URLField(blank=True, default="")
     location = models.CharField(max_length=160, blank=True, default="")
     image_url = models.URLField(blank=True, default="")
+    category_id = models.PositiveIntegerField(null=True, blank=True)
+    category_label = models.CharField(max_length=120, blank=True, default="")
+    master_status_id = models.PositiveIntegerField(null=True, blank=True)
+    master_status_label = models.CharField(max_length=120, blank=True, default="")
+    person_id = models.PositiveIntegerField(null=True, blank=True)
+    person_label = models.CharField(max_length=160, blank=True, default="")
+    linked_document_id = models.PositiveIntegerField(null=True, blank=True)
 
     custom_data_json = models.JSONField(default=dict, blank=True)
     position = models.PositiveIntegerField(default=0)
@@ -260,3 +271,22 @@ class EntryImage(models.Model):
 
     def __str__(self):
         return f"Foto für {self.entry.title}"
+
+
+class EntryDocument(models.Model):
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name="documents")
+    file = models.FileField(upload_to="list_kit_docs/")
+    title = models.CharField(max_length=200, blank=True, default="")
+    is_public = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    @property
+    def filename(self) -> str:
+        name = (self.file.name or "").rsplit("/", 1)[-1]
+        return self.title or name or "Dokument"
+
+    def __str__(self):
+        return self.filename

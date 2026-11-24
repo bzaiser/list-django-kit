@@ -14,8 +14,14 @@ from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
-from .models import Collection, Entry, EntryImage, ListTemplate
-from .services import FIELD_DEFS, notify_staff_submission, seed_default_templates
+from .models import Collection, Entry, EntryDocument, EntryImage, ListTemplate
+from .services import (
+    FIELD_DEFS,
+    get_domain_masterdata_choices,
+    get_linked_domain_document,
+    notify_staff_submission,
+    seed_default_templates,
+)
 
 
 def _user_can_access_collection(user, collection: Collection, write: bool = False) -> bool:
@@ -85,7 +91,7 @@ def collection_detail_view(request, pk):
         return HttpResponseForbidden("Kein Zugriff auf diese Sammlung.")
 
     can_edit = _user_can_access_collection(request.user, col, write=True)
-    entries_qs = col.entries.select_related("created_by").prefetch_related("images").all()
+    entries_qs = col.entries.select_related("created_by").prefetch_related("images", "documents").all()
     if not can_edit:
         entries_qs = entries_qs.filter(visibility="public")
 
@@ -146,18 +152,40 @@ def collection_detail_view(request, pk):
         completed_entries = [e for e in all_entries if e.is_completed]
 
     custom_fields = col.template.custom_fields_json or []
+    masterdata = get_domain_masterdata_choices(col.template.content_type, public_only=col.is_public)
+    prepared_custom_fields = []
+    for cf in custom_fields:
+        if not isinstance(cf, dict) or not cf.get("key"):
+            continue
+        raw_opts = cf.get("options") or ""
+        opts_list = [o.strip() for o in str(raw_opts).split(",") if o.strip()]
+        prepared_custom_fields.append({
+            "key": cf.get("key"),
+            "label": cf.get("label") or cf.get("key"),
+            "type": cf.get("type", "text"),
+            "options": raw_opts,
+            "options_list": opts_list,
+            "zone": cf.get("zone", "body"),
+        })
+
     for entry in active_entries:
         cdata = entry.custom_data_json if isinstance(entry.custom_data_json, dict) else {}
         entry.edit_custom_fields = [
             {
-                "key": cf.get("key"),
-                "label": cf.get("label") or cf.get("key"),
-                "type": cf.get("type", "text"),
-                "value": cdata.get(cf.get("key"), ""),
+                "key": cf["key"],
+                "label": cf["label"],
+                "type": cf["type"],
+                "options_list": cf["options_list"],
+                "value": cdata.get(cf["key"], ""),
             }
-            for cf in custom_fields
-            if isinstance(cf, dict) and cf.get("key") and cf.get("zone") != "hidden"
+            for cf in prepared_custom_fields
+            if cf["zone"] != "hidden"
         ]
+        entry.linked_document_info = (
+            get_linked_domain_document(entry.linked_document_id, require_public=col.is_public)
+            if col.template.use_document and entry.linked_document_id
+            else None
+        )
 
     ctx = {
         "collection": col,
@@ -173,7 +201,8 @@ def collection_detail_view(request, pk):
         "now": timezone.now(),
         "ui": ui,
         "statuses": col.template.get_effective_statuses(),
-        "custom_fields": col.template.custom_fields_json or [],
+        "custom_fields": prepared_custom_fields,
+        "masterdata": masterdata,
         "visibility_choices": Entry.VISIBILITY_CHOICES,
     }
     if ui.get("genre"):
@@ -269,6 +298,42 @@ def entry_save_view(request, pk, entry_id=None):
         entry.location = (request.POST.get("location") or "").strip()[:160]
     if tpl.use_image:
         entry.image_url = (request.POST.get("image_url") or "").strip()[:200]
+    if tpl.use_category or tpl.use_master_status or tpl.use_person or tpl.use_document:
+        md = get_domain_masterdata_choices(tpl.content_type, public_only=col.is_public)
+        if tpl.use_category:
+            cid = (request.POST.get("category_id") or "").strip()
+            if cid.isdigit():
+                entry.category_id = int(cid)
+                match = next((c for c in md["categories"] if c["id"] == entry.category_id), None)
+                entry.category_label = match["name"] if match else ""
+            else:
+                entry.category_id = None
+                entry.category_label = (request.POST.get("category_label") or "").strip()[:120]
+        if tpl.use_master_status:
+            sid = (request.POST.get("master_status_id") or "").strip()
+            if sid.isdigit():
+                entry.master_status_id = int(sid)
+                match = next((s for s in md["statuses"] if s["id"] == entry.master_status_id), None)
+                entry.master_status_label = match["name"] if match else ""
+            else:
+                entry.master_status_id = None
+                entry.master_status_label = (request.POST.get("master_status_label") or "").strip()[:120]
+        if tpl.use_person:
+            pid = (request.POST.get("person_id") or "").strip()
+            if pid.isdigit():
+                entry.person_id = int(pid)
+                match = next((p for p in md["persons"] if p["id"] == entry.person_id), None)
+                entry.person_label = match["name"] if match else ""
+            else:
+                entry.person_id = None
+                entry.person_label = (request.POST.get("person_label") or "").strip()[:160]
+        if tpl.use_document:
+            did = (request.POST.get("linked_document_id") or "").strip()
+            if did.isdigit():
+                doc_info = get_linked_domain_document(int(did), require_public=col.is_public)
+                entry.linked_document_id = doc_info["id"] if doc_info else None
+            else:
+                entry.linked_document_id = None
 
     custom_data = dict(entry.custom_data_json or {})
     for cf in (tpl.custom_fields_json or []):
@@ -303,6 +368,25 @@ def entry_save_view(request, pk, entry_id=None):
                 if img.caption != new_cap:
                     img.caption = new_cap
                     img.save(update_fields=["caption"])
+
+    if tpl.use_document:
+        doc_titles = request.POST.getlist("new_document_titles")
+        doc_public = request.POST.get("new_documents_public", "1") != "0"
+        for idx, doc_file in enumerate(request.FILES.getlist("documents")):
+            d_title = (doc_titles[idx] if idx < len(doc_titles) else "").strip()[:200]
+            EntryDocument.objects.create(entry=entry, file=doc_file, title=d_title, is_public=doc_public)
+
+        del_doc_ids = [int(i) for i in request.POST.getlist("delete_document_ids") if str(i).isdigit()]
+        if del_doc_ids:
+            entry.documents.filter(id__in=del_doc_ids).delete()
+
+        for doc in entry.documents.all():
+            pub_key = f"existing_document_public_{doc.id}"
+            if f"existing_document_present_{doc.id}" in request.POST:
+                new_pub = request.POST.get(pub_key) == "on"
+                if doc.is_public != new_pub:
+                    doc.is_public = new_pub
+                    doc.save(update_fields=["is_public"])
 
     messages.success(request, "Eintrag gespeichert.")
     return redirect("list_kit:collection_detail", pk=col.id)

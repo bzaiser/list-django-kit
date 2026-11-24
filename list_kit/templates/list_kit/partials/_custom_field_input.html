@@ -1,0 +1,54 @@
+<div>
+    <label class="form-label fw-semibold">{{ cf.label }}</label>
+    {% if cf.type == 'textarea' or cf.type == 'markdown' %}
+    <textarea name="custom_{{ cf.key }}" rows="3" class="form-control">{{ cf.value|default:'' }}</textarea>
+    {% elif cf.type == 'checkbox' %}
+    <div class="form-check">
+        <input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input" {% if cf.value %}checked{% endif %}>
+    </div>
+    {% elif cf.type == 'select' %}
+    <select name="custom_{{ cf.key }}" class="form-select">
+        <option value="">— Bitte wählen —</option>
+        {% for opt in cf.options_list %}
+        <option value="{{ opt }}" {% if cf.value == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+    </select>
+    {% elif cf.type == 'radio' %}
+    <div class="d-flex flex-wrap gap-3">
+        {% for opt in cf.options_list %}
+        <div class="form-check">
+            <input type="radio" name="custom_{{ cf.key }}" value="{{ opt }}" id="cf-{{ modal_prefix }}-{{ cf.key }}-{{ forloop.counter }}" class="form-check-input" {% if cf.value == opt %}checked{% endif %}>
+            <label class="form-check-label small" for="cf-{{ modal_prefix }}-{{ cf.key }}-{{ forloop.counter }}">{{ opt }}</label>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif cf.type == 'multiselect' %}
+    <div class="d-flex flex-wrap gap-3">
+        {% for opt in cf.options_list %}
+        <div class="form-check">
+            <input type="checkbox" name="custom_{{ cf.key }}" value="{{ opt }}" id="cf-{{ modal_prefix }}-{{ cf.key }}-{{ forloop.counter }}" class="form-check-input" {% if cf.value and opt in cf.value %}checked{% endif %}>
+            <label class="form-check-label small" for="cf-{{ modal_prefix }}-{{ cf.key }}-{{ forloop.counter }}">{{ opt }}</label>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif cf.type == 'number' %}
+    <input type="number" step="any" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}">
+    {% elif cf.type == 'currency' %}
+    <input type="number" step="0.01" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}" placeholder="0.00">
+    {% elif cf.type == 'date' %}
+    <input type="date" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}">
+    {% elif cf.type == 'url' %}
+    <input type="url" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}" placeholder="https://...">
+    {% elif cf.type == 'rating' %}
+    <select name="custom_{{ cf.key }}" class="form-select">
+        <option value="">— Keine —</option>
+        {% for r in "12345" %}
+        <option value="{{ r }}" {% if cf.value|stringformat:'s' == r %}selected{% endif %}>{{ r }} / 5</option>
+        {% endfor %}
+    </select>
+    {% elif cf.type == 'color' %}
+    <input type="color" name="custom_{{ cf.key }}" class="form-control form-control-color" value="{{ cf.value|default:'#0d6efd' }}">
+    {% else %}
+    <input type="text" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}">
+    {% endif %}
+</div>

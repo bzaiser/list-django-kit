@@ -20,6 +20,19 @@
     {% include "list_kit/partials/_photo_gallery.html" with gallery_suffix="field" %}
 {% elif field_key == 'use_image_checklist' and template.use_image_checklist and not template.use_image %}
     {% include "list_kit/partials/_photo_gallery.html" with gallery_suffix="field" %}
+{% elif field_key == 'use_category' and template.use_category and entry.category_label %}
+    <span class="badge bg-primary-subtle text-primary-emphasis border"><i class="bi bi-folder2-open me-1"></i>{{ entry.category_label }}</span>
+{% elif field_key == 'use_master_status' and template.use_master_status and entry.master_status_label %}
+    <span class="badge bg-info-subtle text-info-emphasis border"><i class="bi bi-bookmark-check me-1"></i>{{ entry.master_status_label }}</span>
+{% elif field_key == 'use_person' and template.use_person and entry.person_label %}
+    <span class="badge bg-body-secondary text-body border"><i class="bi bi-person-badge me-1"></i>{{ entry.person_label }}</span>
+{% elif field_key == 'use_document' and template.use_document %}
+    {% if entry.linked_document_info %}
+    <a href="{{ entry.linked_document_info.url }}" download class="btn btn-outline-secondary btn-sm py-0 px-2"><i class="bi bi-file-earmark-arrow-down me-1"></i>{{ entry.linked_document_info.title }}</a>
+    {% endif %}
+    {% for doc in entry.documents.all %}
+    <a href="{{ doc.file.url }}" download class="btn btn-outline-secondary btn-sm py-0 px-2"><i class="bi bi-file-earmark-arrow-down me-1"></i>{{ doc.filename }}</a>
+    {% endfor %}
 {% else %}
     {% for cf in custom_display %}
         {% with cf_id="cf:"|add:cf.key %}
