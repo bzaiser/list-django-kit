@@ -11,7 +11,12 @@
         </div>
         <h1 class="h3 fw-bold mb-0"><i class="bi {{ template.icon|default:'bi-card-checklist' }} text-primary me-2"></i>{{ collection.title }}</h1>
     </div>
-    <div class="d-flex flex-wrap gap-2">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="{% trans 'Darstellung' %}" id="lk-view-switcher">
+            <button type="button" class="btn {% if ui.layout_mode != 'cards' and ui.layout_mode != 'stacked' %}btn-primary{% else %}btn-outline-secondary{% endif %} lk-col-mode-btn" data-mode="row" title="{% trans 'Zeilen' %}"><i class="bi bi-list-ul"></i></button>
+            <button type="button" class="btn {% if ui.layout_mode == 'cards' %}btn-primary{% else %}btn-outline-secondary{% endif %} lk-col-mode-btn" data-mode="cards" title="{% trans 'Karten' %}"><i class="bi bi-grid-3x3-gap"></i></button>
+            <button type="button" class="btn {% if ui.layout_mode == 'stacked' %}btn-primary{% else %}btn-outline-secondary{% endif %} lk-col-mode-btn" data-mode="stacked" title="{% trans 'Stapel' %}"><i class="bi bi-view-stacked"></i></button>
+        </div>
         <a href="{% url 'list_kit:collection_pdf' collection.id %}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
             <i class="bi bi-file-earmark-pdf me-1"></i>{% trans "PDF / Drucken" %}
         </a>
@@ -55,10 +60,10 @@
 </ul>
 {% endif %}
 
-<div class="{% if ui.layout_mode == 'cards' %}row g-3{% else %}d-flex flex-column gap-2{% endif %}">
+<div id="lk-entries-container" data-default-mode="{{ ui.layout_mode|default:'row' }}" data-card-width="{{ ui.card_width|default:'1/3' }}" class="{% if ui.layout_mode == 'cards' %}row g-3{% elif ui.layout_mode == 'stacked' %}d-flex flex-column gap-3{% else %}d-flex flex-column gap-2{% endif %}">
     {% for entry in active_entries %}
     {% with custom_display=entry.get_custom_field_display %}
-    <div class="{% if ui.layout_mode == 'cards' %}{% if ui.card_width == '1/4' %}col-12 col-sm-6 col-lg-3{% elif ui.card_width == '1/2' %}col-12 col-sm-6{% elif ui.card_width == '3/4' %}col-12 col-lg-9{% elif ui.card_width == 'hero' %}col-12{% else %}col-12 col-md-6 col-xl-4{% endif %}{% endif %}">
+    <div class="lk-entry-item {% if ui.layout_mode == 'cards' %}{% if ui.card_width == '1/4' %}col-12 col-sm-6 col-lg-3{% elif ui.card_width == '1/2' %}col-12 col-sm-6{% elif ui.card_width == '3/4' %}col-12 col-lg-9{% elif ui.card_width == 'hero' %}col-12{% else %}col-12 col-md-6 col-xl-4{% endif %}{% endif %}">
         <div class="card shadow-sm h-100">
             <div class="card-body {% if ui.density == 'compact' %}p-2{% else %}p-3{% endif %} d-flex flex-column justify-content-between gap-2">
                 <div class="d-flex align-items-start gap-2">
@@ -127,6 +132,9 @@
                         {% else %}
                             {% if template.use_price and entry.price %}<span class="badge bg-body-secondary text-body border">{{ entry.price }} €</span>{% endif %}
                             {% if template.use_amount and entry.amount_value is not None %}<span class="badge text-bg-secondary">{{ entry.amount_value|floatformat:"-2" }} {{ entry.amount_unit }}</span>{% endif %}
+                        {% endif %}
+                        {% if ui.show_creator is not False and entry.created_by %}
+                            <span class="small text-muted"><i class="bi bi-person me-1"></i>{{ entry.created_by.get_full_name|default:entry.created_by.username }}</span>
                         {% endif %}
                     </div>
                     {% if can_edit %}
@@ -488,6 +496,42 @@
         } catch (e) {}
     };
     document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('lk-entries-container');
+        const storageKey = 'lk_col_mode_{{ collection.id }}';
+        const cardColMap = {
+            '1/4': 'col-12 col-sm-6 col-lg-3',
+            '1/3': 'col-12 col-md-6 col-xl-4',
+            '1/2': 'col-12 col-sm-6',
+            '3/4': 'col-12 col-lg-9',
+            'hero': 'col-12'
+        };
+        function applyCollectionMode(mode) {
+            if (!container) return;
+            const cw = container.getAttribute('data-card-width') || '1/3';
+            const cardCls = cardColMap[cw] || cardColMap['1/3'];
+            container.className = mode === 'cards' ? 'row g-3' : (mode === 'stacked' ? 'd-flex flex-column gap-3' : 'd-flex flex-column gap-2');
+            container.querySelectorAll('.lk-entry-item').forEach(function(item) {
+                item.className = 'lk-entry-item' + (mode === 'cards' ? (' ' + cardCls) : '');
+            });
+            document.querySelectorAll('.lk-col-mode-btn').forEach(function(btn) {
+                const act = btn.getAttribute('data-mode') === mode;
+                btn.classList.toggle('btn-primary', act);
+                btn.classList.toggle('btn-outline-secondary', !act);
+            });
+        }
+        if (container) {
+            const saved = localStorage.getItem(storageKey);
+            if (saved && ['row', 'cards', 'stacked'].includes(saved)) {
+                applyCollectionMode(saved);
+            }
+            document.querySelectorAll('.lk-col-mode-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const m = btn.getAttribute('data-mode') || 'row';
+                    localStorage.setItem(storageKey, m);
+                    applyCollectionMode(m);
+                });
+            });
+        }
         try {
             const params = new URLSearchParams(window.location.search);
             const editId = params.get('edit');
