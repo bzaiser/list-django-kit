@@ -385,11 +385,87 @@
         return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function renderZonePreviewChips(zoneIds) {
-        return (zoneIds || []).map(fid => {
-            const lbl = escHtml(fieldLabel(fid));
-            return '<span class="badge bg-body-secondary text-body border">' + lbl + '</span>';
-        }).join('');
+    const sampleImgSvg = "data:image/svg+xml;utf8," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 140">' +
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#10b981"/></linearGradient></defs>' +
+        '<rect width="320" height="140" fill="url(#g)"/>' +
+        '<circle cx="255" cy="40" r="20" fill="rgba(255,255,255,0.75)"/>' +
+        '<path d="M0 120 L95 55 L175 105 L235 70 L320 120 L320 140 L0 140 Z" fill="rgba(255,255,255,0.28)"/>' +
+        '</svg>'
+    );
+
+    function renderRealisticField(fid, idx, isCompactRow) {
+        if (fid === 'use_notes') {
+            const texts = [
+                'Herzliche Einladung zur Eröffnung mit Führung durch die aktuellen Werke und kleinem Umtrunk.',
+                'Alle Termine, Hinweise und Materialien für Teilnehmer kompakt im Überblick.',
+                'Kurzer Auszug aus dem Beitrag – weitere Details finden sich direkt im Eintrag.',
+                'Zusammenfassung der wichtigsten Eckdaten und Ansprechpartner.'
+            ];
+            return '<div class="small text-muted w-100">' + texts[idx % texts.length] + '</div>';
+        }
+        if (fid === 'use_image' || fid === 'use_image_checklist') {
+            if (isCompactRow) {
+                return '<img src="' + sampleImgSvg + '" alt="Vorschau" class="rounded-2 object-fit-cover flex-shrink-0" style="width:44px;height:32px;">';
+            }
+            return '<img src="' + sampleImgSvg + '" alt="Vorschau" class="w-100 rounded-2 object-fit-cover mb-1" style="height:84px;">';
+        }
+        if (fid === 'use_status') {
+            return '<span class="badge ' + (idx % 2 === 0 ? 'text-bg-info' : 'text-bg-success') + '">' + (idx % 2 === 0 ? 'Aktiv' : 'Freigegeben') + '</span>';
+        }
+        if (fid === 'use_category') {
+            return '<span class="badge bg-primary-subtle text-primary-emphasis border"><i class="bi bi-folder2-open me-1"></i>' + (idx % 2 === 0 ? 'Ausstellung' : 'Workshop') + '</span>';
+        }
+        if (fid === 'use_master_status') {
+            return '<span class="badge bg-info-subtle text-info-emphasis border"><i class="bi bi-bookmark-check me-1"></i>Aktuell</span>';
+        }
+        if (fid === 'use_person') {
+            return '<span class="badge bg-body-secondary text-body border"><i class="bi bi-person-badge me-1"></i>' + (idx % 2 === 0 ? 'Anna Weber' : 'Max Richter') + '</span>';
+        }
+        if (fid === 'use_document') {
+            return '<span class="btn btn-outline-secondary btn-sm py-0 px-2 disabled"><i class="bi bi-file-earmark-arrow-down me-1"></i>Programm.pdf</span>';
+        }
+        if (fid === 'use_url') {
+            return '<span class="btn btn-outline-primary btn-sm py-0 px-2 disabled"><i class="bi bi-arrow-right me-1"></i>Mehr erfahren</span>';
+        }
+        if (fid === 'use_price') {
+            return '<span class="badge bg-body-secondary text-body border">' + (idx % 2 === 0 ? '24,00 €' : '15,00 €') + '</span>';
+        }
+        if (fid === 'use_amount') {
+            return '<span class="badge text-bg-secondary">' + ((idx + 1) * 2) + ' Stk.</span>';
+        }
+        if (fid === 'use_rating') {
+            return '<span class="badge text-bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>4/5</span>';
+        }
+        if (fid === 'use_location') {
+            return '<span class="badge bg-body-secondary text-body border"><i class="bi bi-geo-alt me-1"></i>Atelier Nord</span>';
+        }
+        if (fid === 'use_start_date' || fid === 'use_end_date' || fid === 'use_reminder') {
+            return '<span class="badge text-bg-secondary"><i class="bi bi-calendar-event me-1"></i>28.11.2026</span>';
+        }
+        if (fid.startsWith('cf:')) {
+            const cf = customFields.find(c => 'cf:' + c.key === fid);
+            const lbl = escHtml((cf && cf.label) ? cf.label : fid.slice(3));
+            let val = 'Beispielwert';
+            if (cf) {
+                if (['select', 'radio', 'multiselect'].includes(cf.type) && cf.options) {
+                    val = cf.options.split(',')[0].trim() || 'Auswahl';
+                } else if (cf.type === 'checkbox') val = 'Ja';
+                else if (cf.type === 'number') val = '42';
+                else if (cf.type === 'currency') val = '18,50 €';
+                else if (cf.type === 'date') val = '05.12.2026';
+                else if (cf.type === 'rating') val = '5/5';
+                else if (cf.type === 'page_link' || cf.type === 'url') {
+                    return '<span class="btn btn-outline-primary btn-sm py-0 px-2 disabled"><i class="bi bi-link-45deg me-1"></i>' + lbl + '</span>';
+                }
+            }
+            return '<span class="badge bg-body-secondary text-body border">' + lbl + ': <strong>' + escHtml(val) + '</strong></span>';
+        }
+        return '<span class="badge bg-body-secondary text-body border">' + escHtml(fieldLabel(fid)) + '</span>';
+    }
+
+    function renderZonePreviewChips(zoneIds, idx, isCompactRow) {
+        return (zoneIds || []).map(fid => renderRealisticField(fid, idx, isCompactRow)).join('');
     }
 
     function renderLivePreview() {
@@ -398,6 +474,7 @@
         const compact = densitySel.value === 'compact';
         const showCreator = creatorChk.checked;
         const iconCls = (iconInp && iconInp.value.trim()) ? iconInp.value.trim() : 'bi-card-checklist';
+        const ctypeVal = ctypeSel ? ctypeSel.value : 'list';
 
         const prevIcon = document.getElementById('lk-preview-icon');
         if (prevIcon) prevIcon.className = 'bi ' + iconCls + ' text-primary';
@@ -433,47 +510,64 @@
         const box = document.getElementById('lk-live-render');
         if (!box) return;
 
-        const samples = ['Beispiel-Eintrag 1', 'Beispiel-Eintrag 2', 'Beispiel-Eintrag 3', 'Beispiel-Eintrag 4'];
+        const sampleMap = {
+            news: ['Vernissage Herbstausstellung', 'Offenes Atelier am Sonntag', 'Neuer Aquarell-Kurs', 'Rückblick Sommerfest'],
+            inventory: ['Beamer Epson EB-X', 'Staffelei Buche groß', 'Moderationskoffer', 'Stehtisch Set (4x)'],
+            photo_gallery: ['Vernissage 2026', 'Sommerfest Impressionen', 'Workshop Keramik', 'Ausstellungsraum'],
+        };
+        const samples = sampleMap[ctypeVal] || ['Sommerfest im Garten', 'Jahresplanung 2026', 'Materialbestellung', 'Vorstandssitzung'];
         const pad = compact ? 'p-2' : 'p-3';
         const colMap = { '1/4': 'col-3', '1/3': 'col-4', '1/2': 'col-6', '3/4': 'col-9', 'hero': 'col-12' };
         const colCls = colMap[width] || 'col-4';
-        const headerChips = renderZonePreviewChips(cardLayout.header);
-        const bodyChips = renderZonePreviewChips(cardLayout.body);
-        const footerChips = renderZonePreviewChips(cardLayout.footer);
         const creatorHtml = showCreator ? '<span class="text-muted" style="font-size:0.72rem;"><i class="bi bi-person me-1"></i>Redakteur</span>' : '';
 
         if (mode === 'cards') {
             const count = width === '1/4' ? 4 : (width === '1/3' ? 3 : 2);
             box.className = 'row g-2';
-            box.innerHTML = samples.slice(0, count).map(title => (
-                '<div class="' + colCls + '">' +
-                '<div class="card shadow-sm h-100"><div class="card-body ' + pad + ' d-flex flex-column justify-content-between gap-2">' +
-                '<div>' +
-                '<div class="d-flex flex-wrap align-items-center gap-1 small"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + '</div>' +
-                (bodyChips ? '<div class="d-flex flex-wrap gap-1 mt-1">' + bodyChips + '</div>' : '') +
-                '</div>' +
-                ((footerChips || creatorHtml) ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-1 border-top pt-1">' +
-                    '<div class="d-flex flex-wrap gap-1">' + footerChips + '</div>' + creatorHtml + '</div>' : '') +
-                '</div></div></div>'
-            )).join('');
+            box.innerHTML = samples.slice(0, count).map((title, idx) => {
+                const headerChips = renderZonePreviewChips(cardLayout.header, idx, false);
+                const bodyChips = renderZonePreviewChips(cardLayout.body, idx, false);
+                const footerChips = renderZonePreviewChips(cardLayout.footer, idx, false);
+                return (
+                    '<div class="' + colCls + '">' +
+                    '<div class="card shadow-sm h-100"><div class="card-body ' + pad + ' d-flex flex-column justify-content-between gap-2">' +
+                    '<div>' +
+                    '<div class="d-flex flex-wrap align-items-center gap-1 small"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + '</div>' +
+                    (bodyChips ? '<div class="d-flex flex-wrap gap-1 mt-1">' + bodyChips + '</div>' : '') +
+                    '</div>' +
+                    ((footerChips || creatorHtml) ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-1 border-top pt-1">' +
+                        '<div class="d-flex flex-wrap gap-1">' + footerChips + '</div>' + creatorHtml + '</div>' : '') +
+                    '</div></div></div>'
+                );
+            }).join('');
         } else if (mode === 'stacked') {
             box.className = 'd-flex flex-column gap-3';
-            box.innerHTML = samples.slice(0, 2).map(title => (
-                '<div class="card shadow-sm"><div class="card-body ' + pad + ' d-flex flex-column gap-2">' +
-                '<div class="d-flex flex-wrap align-items-center gap-2"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + '</div>' +
-                (bodyChips ? '<div class="d-flex flex-wrap gap-1">' + bodyChips + '</div>' : '') +
-                ((footerChips || creatorHtml) ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top pt-2">' +
-                    '<div class="d-flex flex-wrap gap-1">' + footerChips + '</div>' + creatorHtml + '</div>' : '') +
-                '</div></div>'
-            )).join('');
+            box.innerHTML = samples.slice(0, 2).map((title, idx) => {
+                const headerChips = renderZonePreviewChips(cardLayout.header, idx, false);
+                const bodyChips = renderZonePreviewChips(cardLayout.body, idx, false);
+                const footerChips = renderZonePreviewChips(cardLayout.footer, idx, false);
+                return (
+                    '<div class="card shadow-sm"><div class="card-body ' + pad + ' d-flex flex-column gap-2">' +
+                    '<div class="d-flex flex-wrap align-items-center gap-2"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + '</div>' +
+                    (bodyChips ? '<div class="d-flex flex-wrap gap-1">' + bodyChips + '</div>' : '') +
+                    ((footerChips || creatorHtml) ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top pt-2">' +
+                        '<div class="d-flex flex-wrap gap-1">' + footerChips + '</div>' + creatorHtml + '</div>' : '') +
+                    '</div></div>'
+                );
+            }).join('');
         } else {
             box.className = 'd-flex flex-column ' + (compact ? 'gap-1' : 'gap-2');
-            box.innerHTML = samples.slice(0, 3).map(title => (
-                '<div class="card shadow-sm"><div class="card-body ' + pad + ' d-flex flex-wrap justify-content-between align-items-center gap-2">' +
-                '<div class="d-flex flex-wrap align-items-center gap-2 small"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + bodyChips + '</div>' +
-                '<div class="d-flex flex-wrap align-items-center gap-1">' + footerChips + creatorHtml + '</div>' +
-                '</div></div>'
-            )).join('');
+            box.innerHTML = samples.slice(0, 3).map((title, idx) => {
+                const headerChips = renderZonePreviewChips(cardLayout.header, idx, true);
+                const bodyChips = renderZonePreviewChips(cardLayout.body, idx, true);
+                const footerChips = renderZonePreviewChips(cardLayout.footer, idx, true);
+                return (
+                    '<div class="card shadow-sm"><div class="card-body ' + pad + ' d-flex flex-wrap justify-content-between align-items-center gap-2">' +
+                    '<div class="d-flex flex-wrap align-items-center gap-2 small"><i class="bi ' + escHtml(iconCls) + ' text-primary"></i><strong>' + title + '</strong>' + headerChips + bodyChips + '</div>' +
+                    '<div class="d-flex flex-wrap align-items-center gap-1">' + footerChips + creatorHtml + '</div>' +
+                    '</div></div>'
+                );
+            }).join('');
         }
     }
 
