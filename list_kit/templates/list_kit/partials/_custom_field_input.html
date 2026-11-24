@@ -39,6 +39,22 @@
     <input type="date" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}">
     {% elif cf.type == 'url' %}
     <input type="url" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value|default:'' }}" placeholder="https://...">
+    {% elif cf.type == 'page_link' %}
+    <div class="row g-2">
+        {% if site_pages %}
+        <div class="col-md-5">
+            <select class="form-select form-select-sm" onchange="if (this.value) { var f = this.closest('form').querySelector('[name=\'custom_{{ cf.key }}\']'); if (f) f.value = this.value; }">
+                <option value="">— Eigene Webseite wählen —</option>
+                {% for sp in site_pages %}
+                <option value="{{ sp.url }}" {% if cf.value == sp.url %}selected{% endif %}>{{ sp.label }} ({{ sp.url }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="{% if site_pages %}col-md-7{% else %}col-12{% endif %}">
+            <input type="text" name="custom_{{ cf.key }}" class="form-control form-control-sm" value="{{ cf.value|default:'' }}" placeholder="/seite/... oder https://...">
+        </div>
+    </div>
     {% elif cf.type == 'rating' %}
     <select name="custom_{{ cf.key }}" class="form-select">
         <option value="">— Keine —</option>

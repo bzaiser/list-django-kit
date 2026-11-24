@@ -1,0 +1,24 @@
+{% if template.use_url %}
+<div class="border rounded-3 p-3 bg-body-tertiary d-flex flex-column gap-2">
+    <label class="form-label fw-semibold mb-0"><i class="bi bi-link-45deg me-1"></i>Link / Seitenverweis</label>
+    <div class="row g-2">
+        {% if site_pages %}
+        <div class="col-md-5">
+            <select class="form-select form-select-sm" onchange="if (this.value) { var f = this.closest('form').querySelector('[name=url]'); if (f) f.value = this.value; }">
+                <option value="">— Eigene Webseite wählen —</option>
+                {% for sp in site_pages %}
+                <option value="{{ sp.url }}" {% if entry and entry.url == sp.url %}selected{% endif %}>{{ sp.label }} ({{ sp.url }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="{% if site_pages %}col-md-4{% else %}col-md-7{% endif %}">
+            <input type="text" name="url" class="form-control form-control-sm" value="{% if entry %}{{ entry.url }}{% endif %}" placeholder="/seite/... oder https://...">
+        </div>
+        <div class="{% if site_pages %}col-md-3{% else %}col-md-5{% endif %}">
+            <input type="text" name="url_label" class="form-control form-control-sm" value="{% if entry %}{{ entry.url_label }}{% endif %}" placeholder="Link-Text (optional)">
+        </div>
+    </div>
+    <div class="form-text small m-0">Interne Seiten öffnen im selben Fenster, externe Links (<code>https://...</code>) automatisch im neuen Tab.</div>
+</div>
+{% endif %}

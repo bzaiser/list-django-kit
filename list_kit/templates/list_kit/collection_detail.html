@@ -186,6 +186,10 @@
                         </form>
                         {% endif %}
                         <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="modal" data-bs-target="#editEntryModal-{{ entry.id }}" title="Bearbeiten"><i class="bi bi-pencil"></i></button>
+                        <form method="post" action="{% url 'list_kit:entry_duplicate' collection.id entry.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Duplizieren (Kopie anlegen)"><i class="bi bi-copy"></i></button>
+                        </form>
                         <form method="post" action="{% url 'list_kit:entry_delete' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Löschen"><i class="bi bi-trash3"></i></button>
@@ -292,13 +296,13 @@
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if template.use_location or template.use_url or template.use_image %}
+                {% if template.use_location or template.use_image %}
                 <div class="row g-2">
-                    {% if template.use_location %}<div class="col-md-4"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control"></div>{% endif %}
-                    {% if template.use_url %}<div class="col-md-4"><label class="form-label fw-semibold">URL</label><input type="url" name="url" class="form-control"></div>{% endif %}
-                    {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control"></div>{% endif %}
+                    {% if template.use_location %}<div class="col-md-6"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control"></div>{% endif %}
+                    {% if template.use_image %}<div class="col-md-6"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control"></div>{% endif %}
                 </div>
                 {% endif %}
+                {% include "list_kit/partials/_url_link_input.html" with entry=None %}
                 {% if template.use_image %}
                 <div class="border rounded-3 p-3 bg-body-tertiary">
                     <label class="form-label fw-semibold"><i class="bi bi-images me-1"></i>Fotos hochladen (Mehrfachauswahl)</label>
@@ -386,13 +390,13 @@
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if template.use_location or template.use_url or template.use_image %}
+                {% if template.use_location or template.use_image %}
                 <div class="row g-2">
-                    {% if template.use_location %}<div class="col-md-4"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control" value="{{ entry.location }}"></div>{% endif %}
-                    {% if template.use_url %}<div class="col-md-4"><label class="form-label fw-semibold">URL</label><input type="url" name="url" class="form-control" value="{{ entry.url }}"></div>{% endif %}
-                    {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control" value="{{ entry.image_url }}"></div>{% endif %}
+                    {% if template.use_location %}<div class="col-md-6"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control" value="{{ entry.location }}"></div>{% endif %}
+                    {% if template.use_image %}<div class="col-md-6"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control" value="{{ entry.image_url }}"></div>{% endif %}
                 </div>
                 {% endif %}
+                {% include "list_kit/partials/_url_link_input.html" %}
                 {% if template.use_image %}
                 <div class="border rounded-3 p-3 bg-body-tertiary d-flex flex-column gap-2">
                     <label class="form-label fw-semibold mb-0"><i class="bi bi-images me-1"></i>Fotos</label>
@@ -484,6 +488,19 @@
         } catch (e) {}
     };
     document.addEventListener('DOMContentLoaded', function() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const editId = params.get('edit');
+            if (editId && window.bootstrap) {
+                const editModal = document.getElementById('editEntryModal-' + editId);
+                if (editModal) {
+                    bootstrap.Modal.getOrCreateInstance(editModal).show();
+                    params.delete('edit');
+                    const q = params.toString();
+                    window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
+                }
+            }
+        } catch (e) {}
         const prev = document.getElementById('lkLbPrev');
         const next = document.getElementById('lkLbNext');
         const stage = document.getElementById('lkLbStage');

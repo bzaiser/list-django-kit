@@ -20,6 +20,7 @@ urlpatterns = [
     path("<uuid:pk>/delete/", views.collection_delete_view, name="collection_delete"),
     path("<uuid:pk>/entries/add/", views.entry_save_view, name="entry_add"),
     path("<uuid:pk>/entries/<int:entry_id>/edit/", views.entry_save_view, name="entry_edit"),
+    path("<uuid:pk>/entries/<int:entry_id>/duplicate/", views.entry_duplicate_view, name="entry_duplicate"),
     path("<uuid:pk>/entries/<int:entry_id>/confirm/", views.entry_confirm_view, name="entry_confirm"),
     path("<uuid:pk>/entries/<int:entry_id>/create-person/", views.entry_create_person_view, name="entry_create_person"),
     path("<uuid:pk>/entries/<int:entry_id>/toggle/", views.entry_toggle_view, name="entry_toggle"),

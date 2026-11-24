@@ -16,7 +16,7 @@ FIELD_DEFS = [
     {"key": "use_amount", "label": "Menge & Einheit", "icon": "bi-123", "desc": "Zählwert mit optionaler Einheit", "default_zone": "footer"},
     {"key": "use_price", "label": "Preis / Betrag", "icon": "bi-currency-euro", "desc": "Geldbetrag in €", "default_zone": "footer"},
     {"key": "use_rating", "label": "Bewertung (1–5)", "icon": "bi-star", "desc": "Sterne-Bewertung", "default_zone": "footer"},
-    {"key": "use_url", "label": "URL / Link", "icon": "bi-link-45deg", "desc": "Externer Link", "default_zone": "footer"},
+    {"key": "use_url", "label": "Link / Seitenverweis", "icon": "bi-link-45deg", "desc": "Verweis auf eigene Seite oder externen Link (öffnet extern im neuen Tab)", "default_zone": "footer"},
     {"key": "use_image", "label": "Fotos / Bildanhang", "icon": "bi-images", "desc": "Bild-URL oder Mehrfach-Foto-Upload", "default_zone": "body"},
     {"key": "use_image_checklist", "label": "Fotos einzeln abhakbar", "icon": "bi-check2-square", "desc": "Hochgeladene Fotos mit Textzeile abhaken", "default_zone": "body"},
     {"key": "use_location", "label": "Ort / Raum", "icon": "bi-geo-alt", "desc": "Ortsangabe", "default_zone": "body"},
@@ -281,6 +281,25 @@ def get_archived_entries(content_type: str | None = "news", year: int | None = N
     if limit is not None:
         return list(qs[:limit])
     return list(qs)
+
+
+def get_site_page_choices() -> list[dict]:
+    """Return internal website routes & published PublicPage items from site_kit if installed."""
+    pages: list[dict] = []
+    try:
+        from django.apps import apps
+        if not apps.is_installed("site_kit"):
+            return pages
+        from site_kit.models import PublicPage
+        for p in PublicPage.objects.filter(is_published=True).order_by("-is_home", "nav_order", "title"):
+            url = "/" if p.is_home else f"/seite/{p.slug}/"
+            pages.append({"url": url, "label": p.title})
+        for std_url, std_label in (("/news/", "News (Übersicht)"), ("/termine/", "Termine (Übersicht)"), ("/programm/", "Jahresprogramm")):
+            if not any(x["url"] == std_url for x in pages):
+                pages.append({"url": std_url, "label": std_label})
+    except Exception:
+        return pages
+    return pages
 
 
 def get_domain_masterdata_choices(content_type: str = "list", public_only: bool = False) -> dict:

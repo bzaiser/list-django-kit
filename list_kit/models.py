@@ -150,7 +150,8 @@ class Entry(models.Model):
     amount_unit = models.CharField(max_length=30, blank=True, default="")
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     rating = models.PositiveSmallIntegerField(null=True, blank=True)
-    url = models.URLField(blank=True, default="")
+    url = models.CharField(max_length=300, blank=True, default="")
+    url_label = models.CharField(max_length=120, blank=True, default="")
     location = models.CharField(max_length=160, blank=True, default="")
     image_url = models.URLField(blank=True, default="")
     category_id = models.PositiveIntegerField(null=True, blank=True)
@@ -223,6 +224,7 @@ class Entry(models.Model):
                 "label": f.get("label", key),
                 "type": f.get("type", "text"),
                 "value": val,
+                "is_external": str(val).strip().lower().startswith(("http://", "https://", "//")),
                 "show_on_card": f.get("show_on_card", True),
                 "zone": f.get("zone", "body"),
             })
@@ -254,6 +256,11 @@ class Entry(models.Model):
             return None
         done = sum(1 for img in imgs if img.is_checked)
         return {"done": done, "total": len(imgs)}
+
+    @property
+    def is_external_url(self) -> bool:
+        u = (self.url or "").strip().lower()
+        return u.startswith("http://") or u.startswith("https://") or u.startswith("//")
 
     def __str__(self):
         return self.title

@@ -5,10 +5,12 @@ import json
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import get_template
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
@@ -19,6 +21,7 @@ from .services import (
     FIELD_DEFS,
     get_domain_masterdata_choices,
     get_linked_domain_document,
+    get_site_page_choices,
     notify_staff_submission,
     seed_default_templates,
 )
@@ -203,6 +206,7 @@ def collection_detail_view(request, pk):
         "statuses": col.template.get_effective_statuses(),
         "custom_fields": prepared_custom_fields,
         "masterdata": masterdata,
+        "site_pages": get_site_page_choices(),
         "visibility_choices": Entry.VISIBILITY_CHOICES,
     }
     if ui.get("genre"):
@@ -293,7 +297,8 @@ def entry_save_view(request, pk, entry_id=None):
         raw_r = (request.POST.get("rating") or "").strip()
         entry.rating = max(1, min(5, int(raw_r))) if raw_r.isdigit() else None
     if tpl.use_url:
-        entry.url = (request.POST.get("url") or "").strip()[:200]
+        entry.url = (request.POST.get("url") or "").strip()[:300]
+        entry.url_label = (request.POST.get("url_label") or "").strip()[:120]
     if tpl.use_location:
         entry.location = (request.POST.get("location") or "").strip()[:160]
     if tpl.use_image:
@@ -493,6 +498,72 @@ def entry_delete_view(request, pk, entry_id):
     entry.delete()
     messages.success(request, "Eintrag gelöscht.")
     return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+@require_POST
+def entry_duplicate_view(request, pk, entry_id):
+    col = get_object_or_404(Collection.objects.select_related("template"), pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return HttpResponseForbidden()
+    src = get_object_or_404(Entry, pk=entry_id, collection=col)
+    is_news = col.template.content_type == "news"
+    dup = Entry.objects.create(
+        collection=col,
+        title=f"{src.title[:247]} - Kopie",
+        notes=src.notes,
+        status=src.status,
+        is_completed=False,
+        visibility="draft" if is_news else src.visibility,
+        is_pinned=False,
+        start_date=src.start_date,
+        end_date=src.end_date,
+        reminder_at=src.reminder_at,
+        amount_value=src.amount_value,
+        amount_unit=src.amount_unit,
+        price=src.price,
+        rating=src.rating,
+        url=src.url,
+        url_label=src.url_label,
+        location=src.location,
+        image_url=src.image_url,
+        category_id=src.category_id,
+        category_label=src.category_label,
+        master_status_id=src.master_status_id,
+        master_status_label=src.master_status_label,
+        person_id=src.person_id,
+        person_label=src.person_label,
+        linked_document_id=src.linked_document_id,
+        custom_data_json=dict(src.custom_data_json or {}),
+        position=src.position,
+        created_by=request.user,
+    )
+    for img in src.images.all():
+        try:
+            with img.image.open("rb") as fh:
+                name = (img.image.name or "photo.jpg").rsplit("/", 1)[-1]
+                EntryImage.objects.create(
+                    entry=dup,
+                    image=ContentFile(fh.read(), name=name),
+                    caption=img.caption,
+                    is_checked=False,
+                )
+        except Exception:
+            pass
+    for doc in src.documents.all():
+        try:
+            with doc.file.open("rb") as fh:
+                name = (doc.file.name or "doc.bin").rsplit("/", 1)[-1]
+                EntryDocument.objects.create(
+                    entry=dup,
+                    file=ContentFile(fh.read(), name=name),
+                    title=doc.title,
+                    is_public=doc.is_public,
+                )
+        except Exception:
+            pass
+    messages.success(request, f"Kopie „{dup.title}“ angelegt.")
+    return redirect(f"{reverse('list_kit:collection_detail', args=[col.id])}?edit={dup.id}")
 
 
 @require_POST
@@ -760,7 +831,7 @@ def builder_edit_view(request, pk=None):
         cf_zones = request.POST.getlist("cf_zone")
         cf_show_cards = request.POST.getlist("cf_show_card")
         allowed_cf_types = (
-            "text", "textarea", "markdown", "number", "currency", "date", "url",
+            "text", "textarea", "markdown", "number", "currency", "date", "url", "page_link",
             "image", "select", "radio", "multiselect", "checkbox", "rating", "color",
         )
         custom_fields = []
