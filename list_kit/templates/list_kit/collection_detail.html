@@ -401,6 +401,43 @@
                     {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control" value="{{ entry.image_url }}"></div>{% endif %}
                 </div>
                 {% endif %}
+                {% if template.use_image %}
+                <div class="border rounded-3 p-3 bg-body-tertiary d-flex flex-column gap-2">
+                    <label class="form-label fw-semibold mb-0"><i class="bi bi-images me-1"></i>Fotos</label>
+                    {% with existing_imgs=entry.images.all %}
+                    {% if existing_imgs %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for img in existing_imgs %}
+                        <div class="d-flex align-items-center gap-2 border rounded-2 p-2 bg-body">
+                            <img src="{{ img.image.url }}" alt="{{ img.caption }}" class="rounded-2 object-fit-cover flex-shrink-0" style="width: 52px; height: 40px;">
+                            <input type="text" name="existing_image_caption_{{ img.id }}" value="{{ img.caption }}" placeholder="Bildunterschrift" class="form-control form-control-sm">
+                            <div class="form-check flex-shrink-0 mb-0">
+                                <input type="checkbox" name="delete_image_ids" value="{{ img.id }}" id="delImg-{{ entry.id }}-{{ img.id }}" class="form-check-input">
+                                <label class="form-check-label small text-danger" for="delImg-{{ entry.id }}-{{ img.id }}" title="Foto löschen"><i class="bi bi-trash3"></i></label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    <div>
+                        <label class="form-label small text-muted mb-1">Weitere Fotos hochladen (Mehrfachauswahl)</label>
+                        <input type="file" name="images" multiple accept="image/*" class="form-control form-control-sm">
+                    </div>
+                </div>
+                {% endif %}
+                {% for cf in entry.edit_custom_fields %}
+                <div>
+                    <label class="form-label fw-semibold">{{ cf.label }}</label>
+                    {% if cf.type == 'textarea' %}
+                    <textarea name="custom_{{ cf.key }}" rows="2" class="form-control">{{ cf.value }}</textarea>
+                    {% elif cf.type == 'checkbox' %}
+                    <div class="form-check"><input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input" {% if cf.value %}checked{% endif %}></div>
+                    {% else %}
+                    <input type="text" name="custom_{{ cf.key }}" class="form-control" value="{{ cf.value }}">
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Abbrechen" %}</button>

@@ -145,6 +145,20 @@ def collection_detail_view(request, pk):
         active_entries = [e for e in all_entries if not e.is_completed]
         completed_entries = [e for e in all_entries if e.is_completed]
 
+    custom_fields = col.template.custom_fields_json or []
+    for entry in active_entries:
+        cdata = entry.custom_data_json if isinstance(entry.custom_data_json, dict) else {}
+        entry.edit_custom_fields = [
+            {
+                "key": cf.get("key"),
+                "label": cf.get("label") or cf.get("key"),
+                "type": cf.get("type", "text"),
+                "value": cdata.get(cf.get("key"), ""),
+            }
+            for cf in custom_fields
+            if isinstance(cf, dict) and cf.get("key") and cf.get("zone") != "hidden"
+        ]
+
     ctx = {
         "collection": col,
         "template": col.template,
