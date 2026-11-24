@@ -304,11 +304,8 @@
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if template.use_location or template.use_image %}
-                <div class="row g-2">
-                    {% if template.use_location %}<div class="col-md-6"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control"></div>{% endif %}
-                    {% if template.use_image %}<div class="col-md-6"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control"></div>{% endif %}
-                </div>
+                {% if template.use_location %}
+                <div><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control"></div>
                 {% endif %}
                 {% include "list_kit/partials/_url_link_input.html" with entry=None %}
                 {% if template.use_image %}
@@ -319,6 +316,10 @@
                         <span class="spinner-border spinner-border-sm me-1"></span>Optimiere ausgewählte Fotos…
                     </div>
                     <div id="lk-new-images-preview" class="d-flex flex-column gap-2"></div>
+                    <details class="mt-2">
+                        <summary class="small text-muted" style="cursor: pointer;">oder externe Bild-URL angeben</summary>
+                        <input type="url" name="image_url" class="form-control form-control-sm mt-1" placeholder="https://...">
+                    </details>
                 </div>
                 {% endif %}
                 {% include "list_kit/partials/_masterdata_inputs.html" with entry=None %}
@@ -398,11 +399,8 @@
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if template.use_location or template.use_image %}
-                <div class="row g-2">
-                    {% if template.use_location %}<div class="col-md-6"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control" value="{{ entry.location }}"></div>{% endif %}
-                    {% if template.use_image %}<div class="col-md-6"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control" value="{{ entry.image_url }}"></div>{% endif %}
-                </div>
+                {% if template.use_location %}
+                <div><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control" value="{{ entry.location }}"></div>
                 {% endif %}
                 {% include "list_kit/partials/_url_link_input.html" %}
                 {% if template.use_image %}
@@ -428,6 +426,10 @@
                         <label class="form-label small text-muted mb-1">Weitere Fotos hochladen (Mehrfachauswahl)</label>
                         <input type="file" name="images" multiple accept="image/*" class="form-control form-control-sm">
                     </div>
+                    <details class="mt-1" {% if entry.image_url %}open{% endif %}>
+                        <summary class="small text-muted" style="cursor: pointer;">oder externe Bild-URL angeben</summary>
+                        <input type="url" name="image_url" class="form-control form-control-sm mt-1" value="{{ entry.image_url }}" placeholder="https://...">
+                    </details>
                 </div>
                 {% endif %}
                 {% include "list_kit/partials/_masterdata_inputs.html" %}
