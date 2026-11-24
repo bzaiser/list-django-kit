@@ -303,6 +303,8 @@ def get_gallery_photos(collection_slug: str | None = None, limit: int = 60) -> l
             "url": url,
             "caption": img.caption or img.entry.title,
             "entry_title": img.entry.title,
+            "notes": (img.entry.notes or "").strip(),
+            "has_custom_caption": bool((img.caption or "").strip()),
         })
     return photos
 
