@@ -320,6 +320,41 @@ class ListKitTests(TestCase):
         self.assertContains(det_cancel, "Max Mustermann")
         self.assertContains(det_cancel, "Erika Alt")
 
+    def test_news_edit_expires_at_and_archive_helper(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from list_kit.services import get_archived_entries, get_published_entries
+
+        self.client.force_login(self.staff)
+        seed_default_templates()
+        tpl = ListTemplate.objects.filter(content_type="news").first()
+        col = Collection.objects.create(title="Vereins-News", template=tpl, owner=self.staff, is_public=True)
+        future = (timezone.now() + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M")
+
+        r_add = self.client.post(reverse("list_kit:entry_add", args=[col.id]), {
+            "title": "Aktuelle Meldung",
+            "notes": "Inhalt",
+            "visibility": "public",
+            "expires_at": future,
+        })
+        self.assertEqual(r_add.status_code, 302)
+        entry = Entry.objects.get(collection=col, title="Aktuelle Meldung")
+        self.assertEqual(len(get_published_entries(content_type="news")), 1)
+        self.assertEqual(len(get_archived_entries(content_type="news")), 0)
+
+        # Edit and archive immediately
+        r_edit = self.client.post(reverse("list_kit:entry_edit", args=[col.id, entry.id]), {
+            "title": "Geänderte Meldung",
+            "notes": "Neu",
+            "visibility": "public",
+            "archive_now": "1",
+        })
+        self.assertEqual(r_edit.status_code, 302)
+        entry.refresh_from_db()
+        self.assertEqual(entry.title, "Geänderte Meldung")
+        self.assertEqual(len(get_published_entries(content_type="news")), 0)
+        self.assertEqual(len(get_archived_entries(content_type="news")), 1)
+
 
 if __name__ == "__main__":
     import unittest

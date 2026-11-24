@@ -28,6 +28,21 @@
     </div>
 </div>
 
+{% if template.content_type == 'news' %}
+<ul class="nav nav-pills gap-2 mb-3">
+    <li class="nav-item">
+        <a href="?view=active" class="nav-link py-1 px-3 rounded-pill {% if news_view_mode != 'archive' %}active{% else %}bg-body-secondary text-body{% endif %}">
+            Aktuell <span class="badge {% if news_view_mode != 'archive' %}bg-white text-primary{% else %}bg-secondary-subtle text-body{% endif %} ms-1">{{ news_active_count }}</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="?view=archive" class="nav-link py-1 px-3 rounded-pill {% if news_view_mode == 'archive' %}active{% else %}bg-body-secondary text-body{% endif %}">
+            Archiv <span class="badge {% if news_view_mode == 'archive' %}bg-white text-primary{% else %}bg-secondary-subtle text-body{% endif %} ms-1">{{ news_archive_count }}</span>
+        </a>
+    </li>
+</ul>
+{% endif %}
+
 {% if template.content_type == 'form_inbox' and inbox_tabs %}
 <ul class="nav nav-pills gap-2 mb-3">
     {% for tab in inbox_tabs %}
@@ -145,6 +160,13 @@
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
                             <button type="submit" class="btn btn-sm {% if entry.status == 'Abgesagt' or entry.status == 'Abgelehnt' %}btn-danger{% else %}btn-outline-warning{% endif %} py-0 px-2" title="Absagen"><i class="bi bi-x-lg"></i> Absagen</button>
                         </form>
+                        {% if template.content_type == 'news' and entry.expires_at %}
+                            {% if entry.expires_at <= now %}
+                            <span class="badge text-bg-secondary">Im Archiv (seit {{ entry.expires_at|date:"d.m.Y" }})</span>
+                            {% else %}
+                            <span class="badge bg-body-secondary text-body border">Anzeigen bis {{ entry.expires_at|date:"d.m.Y" }}</span>
+                            {% endif %}
+                        {% endif %}
                         {% if template.slug == 'mitgliedsantrag' and not entry.custom_data_json.created_person_id %}
                         <form method="post" action="{% url 'list_kit:entry_create_person' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
@@ -152,6 +174,18 @@
                         </form>
                         {% endif %}
                         {% endif %}
+                        {% if template.content_type == 'news' and news_view_mode != 'archive' %}
+                        <form method="post" action="{% url 'list_kit:entry_edit' collection.id entry.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="title" value="{{ entry.title }}">
+                            <input type="hidden" name="notes" value="{{ entry.notes }}">
+                            <input type="hidden" name="visibility" value="{{ entry.visibility }}">
+                            {% if entry.is_pinned %}<input type="hidden" name="is_pinned" value="on">{% endif %}
+                            <input type="hidden" name="archive_now" value="1">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Sofort ins Archiv"><i class="bi bi-archive"></i></button>
+                        </form>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="modal" data-bs-target="#editEntryModal-{{ entry.id }}" title="Bearbeiten"><i class="bi bi-pencil"></i></button>
                         <form method="post" action="{% url 'list_kit:entry_delete' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Löschen"><i class="bi bi-trash3"></i></button>
@@ -226,11 +260,27 @@
                         <label class="form-label fw-semibold">Sichtbarkeit</label>
                         <select name="visibility" class="form-select">
                             {% for vk, vl in visibility_choices %}
-                            <option value="{{ vk }}" {% if vk == 'internal' %}selected{% endif %}>{{ vl }}</option>
+                            <option value="{{ vk }}" {% if vk == 'public' and template.content_type == 'news' %}selected{% elif vk == 'internal' and template.content_type != 'news' %}selected{% endif %}>{{ vl }}</option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
+                {% if template.content_type == 'news' %}
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Veröffentlichen ab (optional)</label>
+                        <input type="datetime-local" name="publish_at" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Anzeigen bis (danach ins Archiv)</label>
+                        <input type="datetime-local" name="expires_at" class="form-control">
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" name="is_pinned" id="newEntryPinned" class="form-check-input">
+                    <label class="form-check-label small" for="newEntryPinned">Oben anpinnen</label>
+                </div>
+                {% endif %}
                 {% if template.use_price or template.use_amount %}
                 <div class="row g-2">
                     {% if template.use_price %}
@@ -279,6 +329,87 @@
         </form>
     </div>
 </div>
+{% for entry in active_entries %}
+<div class="modal fade" id="editEntryModal-{{ entry.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <form method="post" action="{% url 'list_kit:entry_edit' collection.id entry.id %}" enctype="multipart/form-data" class="modal-content rounded-4">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Eintrag bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body d-flex flex-column gap-3">
+                <div>
+                    <label class="form-label fw-semibold">Titel</label>
+                    <input type="text" name="title" class="form-control" value="{{ entry.title }}" required>
+                </div>
+                {% if template.use_notes %}
+                <div>
+                    <label class="form-label fw-semibold">Notizen / Text</label>
+                    <textarea name="notes" rows="4" class="form-control">{{ entry.notes }}</textarea>
+                </div>
+                {% endif %}
+                <div class="row g-2">
+                    {% if template.use_status %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Status</label>
+                        <select name="status" class="form-select">
+                            {% for st in statuses %}
+                            <option value="{{ st.key }}" {% if entry.status == st.key or entry.status == st.label %}selected{% endif %}>{{ st.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Sichtbarkeit</label>
+                        <select name="visibility" class="form-select">
+                            {% for vk, vl in visibility_choices %}
+                            <option value="{{ vk }}" {% if entry.visibility == vk %}selected{% endif %}>{{ vl }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% if template.content_type == 'news' %}
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Veröffentlichen ab</label>
+                        <input type="datetime-local" name="publish_at" class="form-control" value="{% if entry.publish_at %}{{ entry.publish_at|date:'Y-m-d\TH:i' }}{% endif %}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Anzeigen bis (danach ins Archiv)</label>
+                        <input type="datetime-local" name="expires_at" class="form-control" value="{% if entry.expires_at %}{{ entry.expires_at|date:'Y-m-d\TH:i' }}{% endif %}">
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" name="is_pinned" id="editPinned-{{ entry.id }}" class="form-check-input" {% if entry.is_pinned %}checked{% endif %}>
+                    <label class="form-check-label small" for="editPinned-{{ entry.id }}">Oben anpinnen</label>
+                </div>
+                {% endif %}
+                {% if template.use_price or template.use_amount %}
+                <div class="row g-2">
+                    {% if template.use_price %}<div class="col-md-6"><label class="form-label fw-semibold">Preis (€)</label><input type="text" name="price" class="form-control" value="{{ entry.price|default_if_none:'' }}"></div>{% endif %}
+                    {% if template.use_amount %}
+                    <div class="col-md-4"><label class="form-label fw-semibold">Menge</label><input type="text" name="amount_value" class="form-control" value="{{ entry.amount_value|default_if_none:'' }}"></div>
+                    <div class="col-md-2"><label class="form-label fw-semibold">Einheit</label><input type="text" name="amount_unit" class="form-control" value="{{ entry.amount_unit }}"></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if template.use_location or template.use_url or template.use_image %}
+                <div class="row g-2">
+                    {% if template.use_location %}<div class="col-md-4"><label class="form-label fw-semibold">Ort</label><input type="text" name="location" class="form-control" value="{{ entry.location }}"></div>{% endif %}
+                    {% if template.use_url %}<div class="col-md-4"><label class="form-label fw-semibold">URL</label><input type="url" name="url" class="form-control" value="{{ entry.url }}"></div>{% endif %}
+                    {% if template.use_image %}<div class="col-md-4"><label class="form-label fw-semibold">Bild-URL</label><input type="url" name="image_url" class="form-control" value="{{ entry.image_url }}"></div>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Abbrechen" %}</button>
+                <button type="submit" class="btn btn-primary">{% trans "Speichern" %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
 {% endif %}
 
 <!-- Leuchtkasten Modal -->

@@ -132,6 +132,15 @@ def collection_detail_view(request, pk):
             status_filter = "all"
             active_entries = all_entries
         completed_entries = []
+    elif col.template.content_type == "news":
+        now = timezone.now()
+        news_view_mode = (request.GET.get("view") or "active").strip().lower()
+        if news_view_mode not in ("active", "archive"):
+            news_view_mode = "active"
+        active_news = [e for e in all_entries if not e.expires_at or e.expires_at > now]
+        archived_news = [e for e in all_entries if e.expires_at and e.expires_at <= now]
+        active_entries = archived_news if news_view_mode == "archive" else active_news
+        completed_entries = []
     else:
         active_entries = [e for e in all_entries if not e.is_completed]
         completed_entries = [e for e in all_entries if e.is_completed]
@@ -144,6 +153,10 @@ def collection_detail_view(request, pk):
         "completed_entries": completed_entries,
         "status_filter": status_filter,
         "inbox_tabs": inbox_tabs,
+        "news_view_mode": locals().get("news_view_mode", "active"),
+        "news_active_count": len(locals().get("active_news", [])),
+        "news_archive_count": len(locals().get("archived_news", [])),
+        "now": timezone.now(),
         "ui": ui,
         "statuses": col.template.get_effective_statuses(),
         "custom_fields": col.template.custom_fields_json or [],
@@ -215,14 +228,18 @@ def entry_save_view(request, pk, entry_id=None):
         entry.visibility = vis
     entry.is_pinned = request.POST.get("is_pinned") == "on"
 
-    for dt_field in ("start_date", "end_date", "reminder_at", "publish_at"):
+    for dt_field in ("start_date", "end_date", "reminder_at", "publish_at", "expires_at"):
         raw_dt = (request.POST.get(dt_field) or "").strip()
         if raw_dt:
             parsed = parse_datetime(raw_dt)
             if parsed is not None:
+                if timezone.is_naive(parsed):
+                    parsed = timezone.make_aware(parsed)
                 setattr(entry, dt_field, parsed)
         elif dt_field in request.POST:
             setattr(entry, dt_field, None)
+    if request.POST.get("archive_now") == "1":
+        entry.expires_at = timezone.now()
 
     if tpl.use_amount:
         entry.amount_value = _parse_decimal(request.POST.get("amount_value", ""))

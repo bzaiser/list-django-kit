@@ -250,6 +250,23 @@ def get_published_entries(content_type: str | None = None, collection_slug: str 
     return list(qs)
 
 
+def get_archived_entries(content_type: str | None = "news", year: int | None = None, limit: int | None = None):
+    """Return expired/archived public Entry objects across public collections."""
+    now = timezone.now()
+    qs = (
+        Entry.objects.select_related("collection", "collection__template", "created_by")
+        .filter(collection__is_public=True, visibility="public", expires_at__isnull=False, expires_at__lte=now)
+    )
+    if content_type:
+        qs = qs.filter(collection__template__content_type=content_type)
+    if year:
+        qs = qs.filter(Q(publish_at__year=year) | Q(publish_at__isnull=True, created_at__year=year))
+    qs = qs.order_by("-publish_at", "-created_at")
+    if limit is not None:
+        return list(qs[:limit])
+    return list(qs)
+
+
 def notify_staff_submission(collection, entry) -> None:
     """Notify collection owner and staff via notify_kit when a public form is submitted."""
     try:
