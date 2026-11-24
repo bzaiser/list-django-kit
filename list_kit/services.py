@@ -171,6 +171,18 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             ],
             "is_system": True,
         },
+        {
+            "slug": "fotoalbum",
+            "name": "Fotoalbum / Impressionen",
+            "icon": "bi-images",
+            "content_type": "list",
+            "description": "Bildergalerie & Impressionen für Veranstaltungen und die Webseite.",
+            "use_notes": True,
+            "use_image": True,
+            "use_start_date": True,
+            "ui_style_json": {"layout_mode": "cards", "card_width": "1/3", "density": "normal"},
+            "is_system": True,
+        },
     ]
     created_or_existing = []
     for item in defaults:
@@ -265,6 +277,34 @@ def get_archived_entries(content_type: str | None = "news", year: int | None = N
     if limit is not None:
         return list(qs[:limit])
     return list(qs)
+
+
+def get_gallery_photos(collection_slug: str | None = None, limit: int = 60) -> list[dict]:
+    """Return public EntryImage items from public collections for site_kit photo galleries."""
+    from .models import EntryImage
+
+    qs = (
+        EntryImage.objects.select_related("entry", "entry__collection")
+        .filter(entry__collection__is_public=True, entry__visibility="public")
+        .order_by("-entry__is_pinned", "-entry__created_at", "id")
+    )
+    if collection_slug:
+        qs = qs.filter(entry__collection__slug=collection_slug)
+    photos = []
+    for img in qs[:limit]:
+        try:
+            url = img.image.url
+        except Exception:
+            url = ""
+        if not url:
+            continue
+        photos.append({
+            "id": img.id,
+            "url": url,
+            "caption": img.caption or img.entry.title,
+            "entry_title": img.entry.title,
+        })
+    return photos
 
 
 def notify_staff_submission(collection, entry) -> None:
