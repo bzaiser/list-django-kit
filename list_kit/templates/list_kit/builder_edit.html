@@ -347,6 +347,7 @@
         const typeChoices = [
             ['text', 'Text (einzeilig)'],
             ['textarea', 'Mehrzeilig'],
+            ['wysiwyg', 'Formatierter Text (WYSIWYG)'],
             ['markdown', 'Markdown'],
             ['select', 'Dropdown (Auswahl)'],
             ['multiselect', 'Mehrfachauswahl'],
@@ -437,7 +438,7 @@
     );
 
     function renderRealisticField(fid, idx, isCompactRow) {
-        if (fid === 'use_notes') {
+        if (fid === 'use_notes' || fid === 'use_rich_notes') {
             const texts = [
                 'Herzliche Einladung zur Eröffnung mit Führung durch die aktuellen Werke und kleinem Umtrunk.',
                 'Alle Termine, Hinweise und Materialien für Teilnehmer kompakt im Überblick.',

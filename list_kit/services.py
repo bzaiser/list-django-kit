@@ -9,6 +9,7 @@ from .models import Entry, ListTemplate
 
 FIELD_DEFS = [
     {"key": "use_notes", "label": "Notizen / Text", "icon": "bi-card-text", "desc": "Freitext oder Beschreibung", "default_zone": "body"},
+    {"key": "use_rich_notes", "label": "WYSIWYG-Text (Notizen)", "icon": "bi-textarea-t", "desc": "Formatierter Text-Editor (Fett, Listen, Links) für Notizen", "default_zone": "body"},
     {"key": "use_status", "label": "Status-Auswahl", "icon": "bi-tag", "desc": "Eigene Statuswerte (Offen, Erledigt...)", "default_zone": "header"},
     {"key": "use_start_date", "label": "Startdatum", "icon": "bi-calendar-event", "desc": "Beginn / Startzeitpunkt", "default_zone": "body"},
     {"key": "use_end_date", "label": "Enddatum / Frist", "icon": "bi-flag", "desc": "Fälligkeits- oder Enddatum", "default_zone": "body"},
@@ -196,6 +197,16 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
         obj, _ = ListTemplate.objects.using(db_alias).get_or_create(slug=slug, defaults=defaults_dict)
         created_or_existing.append(obj)
     return created_or_existing
+
+
+def sanitize_rich_html(raw_html: str) -> str:
+    """Allow safe WYSIWYG formatting tags while stripping scripts and event handlers."""
+    if not raw_html:
+        return ""
+    cleaned = re.sub(r"(?is)<(script|style|iframe|object|embed)[^>]*>.*?</\1>", "", raw_html)
+    cleaned = re.sub(r"(?is)\son[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", cleaned)
+    cleaned = re.sub(r"(?is)(href|src)\s*=\s*([\"'])\s*javascript:[^\"']*\2", r'\1=\2#\2', cleaned)
+    return cleaned.strip()
 
 
 def render_safe_markdown(text: str) -> str:

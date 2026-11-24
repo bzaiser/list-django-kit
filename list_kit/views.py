@@ -23,6 +23,7 @@ from .services import (
     get_linked_domain_document,
     get_site_page_choices,
     notify_staff_submission,
+    sanitize_rich_html,
     seed_default_templates,
 )
 
@@ -261,7 +262,8 @@ def entry_save_view(request, pk, entry_id=None):
 
     tpl = col.template
     entry.title = title[:255]
-    entry.notes = (request.POST.get("notes") or "").strip()
+    raw_notes = (request.POST.get("notes") or "").strip()
+    entry.notes = sanitize_rich_html(raw_notes) if tpl.use_rich_notes else raw_notes
 
     statuses = tpl.get_effective_statuses()
     status_map = {s["key"]: s for s in statuses if isinstance(s, dict) and s.get("key")}
@@ -357,6 +359,8 @@ def entry_save_view(request, pk, entry_id=None):
             custom_data[key] = request.POST.get(form_key) == "on"
         elif ftype == "multiselect":
             custom_data[key] = [v.strip() for v in request.POST.getlist(form_key) if v.strip()]
+        elif ftype == "wysiwyg":
+            custom_data[key] = sanitize_rich_html((request.POST.get(form_key) or "").strip())
         else:
             custom_data[key] = (request.POST.get(form_key) or "").strip()
     entry.custom_data_json = custom_data
@@ -602,6 +606,8 @@ def public_submit_view(request, pk):
             custom_data[key] = request.POST.get(form_key) == "on"
         elif ftype == "multiselect":
             custom_data[key] = [v.strip() for v in request.POST.getlist(form_key) if v.strip()]
+        elif ftype == "wysiwyg":
+            custom_data[key] = sanitize_rich_html((request.POST.get(form_key) or "").strip())
         else:
             custom_data[key] = (request.POST.get(form_key) or "").strip()
 
@@ -844,7 +850,7 @@ def builder_edit_view(request, pk=None):
         cf_zones = request.POST.getlist("cf_zone")
         cf_show_cards = request.POST.getlist("cf_show_card")
         allowed_cf_types = (
-            "text", "textarea", "markdown", "number", "currency", "date", "url", "page_link",
+            "text", "textarea", "markdown", "wysiwyg", "number", "currency", "date", "url", "page_link",
             "image", "select", "radio", "multiselect", "checkbox", "rating", "color",
         )
         custom_fields = []

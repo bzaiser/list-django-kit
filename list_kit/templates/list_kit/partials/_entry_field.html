@@ -1,5 +1,7 @@
 {% if field_key == 'use_notes' and entry.notes %}
-    <span class="small text-muted text-break">{{ entry.notes|truncatechars:140 }}</span>
+    <span class="small text-muted text-break">{{ entry.notes|striptags|truncatechars:140 }}</span>
+{% elif field_key == 'use_rich_notes' and entry.notes %}
+    <span class="small text-muted text-break">{{ entry.notes|striptags|truncatechars:140 }}</span>
 {% elif field_key == 'use_location' and template.use_location and entry.location %}
     <span class="badge bg-body-secondary text-body border"><i class="bi bi-geo-alt me-1"></i>{{ entry.location }}</span>
 {% elif field_key == 'use_start_date' and template.use_start_date and entry.start_date %}
@@ -43,6 +45,8 @@
             <a href="{{ cf.value }}" {% if cf.is_external or cf.type == 'url' %}target="_blank" rel="noopener noreferrer"{% endif %} class="btn btn-outline-primary btn-sm py-0 px-2">
                 <i class="bi {% if cf.is_external or cf.type == 'url' %}bi-box-arrow-up-right{% else %}bi-arrow-right{% endif %} me-1"></i>{{ cf.label }}
             </a>
+            {% elif cf.type == 'wysiwyg' %}
+            <span class="small text-muted text-break">{{ cf.value|striptags|truncatechars:120 }}</span>
             {% else %}
             <span class="badge bg-body-secondary text-body border">{{ cf.label }}: <strong>{{ cf.value }}</strong></span>
             {% endif %}

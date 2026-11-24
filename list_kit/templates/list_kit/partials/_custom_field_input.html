@@ -2,6 +2,19 @@
     <label class="form-label fw-semibold">{{ cf.label }}</label>
     {% if cf.type == 'textarea' or cf.type == 'markdown' %}
     <textarea name="custom_{{ cf.key }}" rows="3" class="form-control">{{ cf.value|default:'' }}</textarea>
+    {% elif cf.type == 'wysiwyg' %}
+    <div class="lk-wysiwyg-wrap">
+        <div class="btn-toolbar gap-1 mb-1 lk-wysiwyg-tb" role="toolbar">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="bold" title="Fett"><strong>B</strong></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="italic" title="Kursiv"><em>I</em></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="underline" title="Unterstrichen"><u>U</u></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="insertUnorderedList" title="Aufzählung"><i class="bi bi-list-ul"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="createLink" title="Link einfügen"><i class="bi bi-link-45deg"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-cmd="removeFormat" title="Formatierung entfernen"><i class="bi bi-eraser"></i></button>
+        </div>
+        <div contenteditable="true" class="form-control form-control-sm bg-body lk-wysiwyg-ed" style="min-height: 120px; max-height: 240px; overflow-y: auto;"></div>
+        <textarea name="custom_{{ cf.key }}" class="d-none lk-wysiwyg-input">{{ cf.value|default:'' }}</textarea>
+    </div>
     {% elif cf.type == 'checkbox' %}
     <div class="form-check">
         <input type="checkbox" name="custom_{{ cf.key }}" class="form-check-input" {% if cf.value %}checked{% endif %}>

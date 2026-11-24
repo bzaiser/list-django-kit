@@ -20,6 +20,7 @@ class ListTemplate(models.Model):
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES, default="list")
 
     use_notes = models.BooleanField(default=True)
+    use_rich_notes = models.BooleanField(default=False)
     use_status = models.BooleanField(default=True)
     use_start_date = models.BooleanField(default=False)
     use_end_date = models.BooleanField(default=False)
