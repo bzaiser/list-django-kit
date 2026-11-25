@@ -133,6 +133,7 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
                 {"key": "telefon", "label": "Telefon", "type": "text", "options": "", "zone": "body", "show_on_card": False},
                 {"key": "strasse", "label": "Straße & Hausnummer", "type": "text", "options": "", "zone": "body", "show_on_card": False},
                 {"key": "plz_ort", "label": "PLZ / Ort", "type": "text", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "portal_zugang", "label": "Portal-Zugang gewünscht?", "type": "select", "options": "Ja, Nein", "zone": "body", "show_on_card": True},
             ],
             "is_system": True,
         },

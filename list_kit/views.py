@@ -800,7 +800,39 @@ def entry_create_person_view(request, pk, entry_id):
     data["created_person_id"] = person.id
     entry.custom_data_json = data
     entry.save(update_fields=["custom_data_json", "updated_at"])
-    messages.success(request, f"Person „{person.full_name}“ in domain_kit angelegt.")
+
+    if request.POST.get("create_portal_user") == "1":
+        from django.contrib.auth import get_user_model
+        from django.contrib.auth.models import Group
+        from django.utils.crypto import get_random_string
+        from django.utils.text import slugify
+
+        User = get_user_model()
+        base = slugify(f"{first}.{last}".replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")).replace("-", ".") or "mitglied"
+        uname = base[:30]
+        idx = 2
+        while User.objects.filter(username=uname).exists():
+            uname = f"{base[:25]}{idx}"
+            idx += 1
+        raw_pw = (request.POST.get("portal_password") or "").strip() or get_random_string(10)
+        u = User.objects.create_user(
+            username=uname,
+            email=email,
+            password=raw_pw,
+            first_name=first[:30],
+            last_name=last[:30],
+            is_staff=False,
+        )
+        grp, _ = Group.objects.get_or_create(name="Mitglied / Portal")
+        u.groups.add(grp)
+        person.user = u
+        person.save(update_fields=["user"])
+        messages.success(
+            request,
+            f"Person „{person.full_name}“ + Portal-Login „{uname}“ (Start-Passwort: {raw_pw}) angelegt.",
+        )
+    else:
+        messages.success(request, f"Person „{person.full_name}“ (ohne Portal-Login) angelegt.")
     return redirect("list_kit:collection_detail", pk=col.id)
 
 

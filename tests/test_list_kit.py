@@ -377,6 +377,20 @@ class ListKitTests(TestCase):
         r_create = self.client.get(reverse("list_kit:collection_create"))
         self.assertEqual(r_create.status_code, 403)
 
+    def test_mitgliedsantrag_optional_portal_login(self):
+        from list_kit.services import seed_default_templates
+        self.client.force_login(self.user)
+        tpl_map = {t.slug: t for t in seed_default_templates()}
+        col = Collection.objects.create(title="Anträge", template=tpl_map["mitgliedsantrag"], owner=self.user)
+        e1 = Entry.objects.create(
+            collection=col,
+            title="Ohne Login",
+            custom_data_json={"vorname": "Erika", "nachname": "Ohne", "portal_zugang": "Nein"},
+            created_by=self.user,
+        )
+        r1 = self.client.post(reverse("list_kit:entry_create_person", args=[col.id, e1.id]))
+        self.assertEqual(r1.status_code, 302)
+
 
 if __name__ == "__main__":
     import unittest

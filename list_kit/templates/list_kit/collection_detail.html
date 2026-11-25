@@ -186,8 +186,11 @@
                             {% endif %}
                         {% endif %}
                         {% if template.slug == 'mitgliedsantrag' and not entry.custom_data_json.created_person_id %}
-                        <form method="post" action="{% url 'list_kit:entry_create_person' collection.id entry.id %}" class="d-inline">
+                        <form method="post" action="{% url 'list_kit:entry_create_person' collection.id entry.id %}" class="d-inline-flex align-items-center gap-1">
                             {% csrf_token %}
+                            <label class="small text-muted mb-0" title="Portal-Login mitanlegen">
+                                <input type="checkbox" name="create_portal_user" value="1" class="form-check-input me-1" {% if entry.custom_data_json.portal_zugang == 'Ja' %}checked{% endif %}>Login
+                            </label>
                             <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="Als Person anlegen"><i class="bi bi-person-plus"></i></button>
                         </form>
                         {% endif %}
