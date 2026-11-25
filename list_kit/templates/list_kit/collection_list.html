@@ -15,9 +15,11 @@
             <i class="bi bi-ui-checks-grid me-1"></i>{% trans "Template-Builder" %}
         </a>
         {% endif %}
+        {% if can_create_collection %}
         <a href="{% url 'list_kit:collection_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
             <i class="bi bi-plus-circle me-1"></i>{% trans "Neue Sammlung" %}
         </a>
+        {% endif %}
     </div>
 </div>
 

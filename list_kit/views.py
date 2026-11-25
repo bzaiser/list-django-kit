@@ -50,6 +50,19 @@ def _user_allowed_collections(user):
     return Collection.objects.filter(q).distinct()
 
 
+def _can_manage_collections(user) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    from django.contrib.auth.models import Group
+    if not Group.objects.exists():
+        return True
+    return user.groups.filter(
+        name__in=("Leitung / Vorstand", "Vorstand", "Schriftführer", "Redakteur", "Pressewart", "Mitarbeiter")
+    ).exists()
+
+
 @login_required
 def collection_list_view(request):
     seed_default_templates()
@@ -61,11 +74,16 @@ def collection_list_view(request):
             done_count=Count("entries", filter=Q(entries__is_completed=True)),
         )
     )
-    return render(request, "list_kit/collection_list.html", {"collections": qs})
+    return render(request, "list_kit/collection_list.html", {
+        "collections": qs,
+        "can_create_collection": _can_manage_collections(request.user),
+    })
 
 
 @login_required
 def collection_create_view(request):
+    if not _can_manage_collections(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Erstellen neuer Sammlungen.")
     seed_default_templates()
     templates = ListTemplate.objects.all()
     if request.method == "POST":
@@ -225,7 +243,7 @@ def collection_detail_view(request, pk):
 @require_POST
 def collection_delete_view(request, pk):
     col = get_object_or_404(Collection, pk=pk)
-    if col.owner_id != request.user.id and not request.user.is_superuser:
+    if (col.owner_id != request.user.id or not _can_manage_collections(request.user)) and not request.user.is_superuser:
         return HttpResponseForbidden()
     title = col.title
     col.delete()

@@ -369,6 +369,14 @@ class ListKitTests(TestCase):
         r_prot = self.client.get(reverse("list_kit:entry_protocol_pdf", args=[col_prot.id, e_prot.id]))
         self.assertEqual(r_prot.status_code, 200)
 
+        from django.contrib.auth import get_user_model
+        from django.contrib.auth.models import Group
+        Group.objects.get_or_create(name="Mitglied / Portal")
+        normal = get_user_model().objects.create_user(username="member_plain", password="pw", is_staff=False)
+        self.client.force_login(normal)
+        r_create = self.client.get(reverse("list_kit:collection_create"))
+        self.assertEqual(r_create.status_code, 403)
+
 
 if __name__ == "__main__":
     import unittest
