@@ -662,6 +662,23 @@ def entry_confirm_view(request, pk, entry_id):
             data.pop("paid_at", None)
         entry.is_completed = False
         msg = f"Eintrag „{entry.title}“ als {'Bezahlt' if is_paid else 'Nicht bezahlt'} markiert."
+    elif decision == "payment_update":
+        raw_paid = (request.POST.get("paid_amount") or "").strip().replace(",", ".")
+        raw_cancel = (request.POST.get("cancellation_fee") or "").strip().replace(",", ".")
+        if raw_paid:
+            data["paid_amount"] = raw_paid
+            try:
+                data["is_paid"] = float(raw_paid) > 0
+            except ValueError:
+                pass
+        else:
+            data.pop("paid_amount", None)
+        if raw_cancel:
+            data["cancellation_fee"] = raw_cancel
+        else:
+            data.pop("cancellation_fee", None)
+        entry.is_completed = False
+        msg = f"Zahlungs-/Stornodaten für „{entry.title}“ aktualisiert."
     elif decision == "attended":
         data["attended_by"] = username
         data["attended_at"] = now_str
