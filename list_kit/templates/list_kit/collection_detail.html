@@ -203,6 +203,12 @@
                             <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Sofort ins Archiv"><i class="bi bi-archive"></i></button>
                         </form>
                         {% endif %}
+                        {% if template.slug == 'protokoll' %}
+                        <a href="{% url 'list_kit:entry_protocol_pdf' collection.id entry.id %}" target="_blank" class="btn btn-sm btn-outline-success py-0 px-2" title="Protokoll-PDF"><i class="bi bi-file-earmark-pdf"></i></a>
+                        {% endif %}
+                        {% if template.content_type == 'news' %}
+                        <a href="{% url 'list_kit:entry_press_pdf' collection.id entry.id %}" target="_blank" class="btn btn-sm btn-outline-success py-0 px-2" title="Pressemitteilung-PDF"><i class="bi bi-newspaper"></i></a>
+                        {% endif %}
                         <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="modal" data-bs-target="#editEntryModal-{{ entry.id }}" title="Bearbeiten"><i class="bi bi-pencil"></i></button>
                         <form method="post" action="{% url 'list_kit:entry_duplicate' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}

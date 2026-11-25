@@ -1079,3 +1079,57 @@ def builder_delete_view(request, pk):
     tpl.delete()
     messages.success(request, f"Vorlage „{name}“ gelöscht.")
     return redirect("list_kit:builder_list")
+
+
+def _render_entry_pdf(template_name: str, ctx: dict, filename: str) -> HttpResponse:
+    from django.template.loader import render_to_string
+    html = render_to_string(template_name, ctx)
+    try:
+        from io import BytesIO
+        from xhtml2pdf import pisa
+        buf = BytesIO()
+        status = pisa.CreatePDF(html, dest=buf, encoding="utf-8")
+        if not status.err:
+            resp = HttpResponse(buf.getvalue(), content_type="application/pdf")
+            resp["Content-Disposition"] = f'inline; filename="{filename}"'
+            return resp
+    except Exception:
+        pass
+    return HttpResponse(html)
+
+
+@login_required
+def entry_protocol_pdf_view(request, pk, entry_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    return _render_entry_pdf(
+        "list_kit/protocol_pdf.html",
+        {"collection": col, "entry": entry, "data": entry.custom_data_json or {}},
+        f"protokoll-{entry.id}.pdf",
+    )
+
+
+@login_required
+def entry_press_pdf_view(request, pk, entry_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    org_name = getattr(settings, "DESIGN_STUDIO_APP_NAME", "Kunstverein")
+    contact_email = ""
+    from django.apps import apps
+    if apps.is_installed("site_kit"):
+        try:
+            from site_kit.models import SiteConfig
+            cfg = SiteConfig.get_solo()
+            org_name = cfg.site_name or org_name
+            contact_email = cfg.contact_email
+        except Exception:
+            pass
+    return _render_entry_pdf(
+        "list_kit/press_pdf.html",
+        {"collection": col, "entry": entry, "org_name": org_name, "contact_email": contact_email},
+        f"pressemitteilung-{entry.id}.pdf",
+    )

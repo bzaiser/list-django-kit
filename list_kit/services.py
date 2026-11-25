@@ -189,6 +189,23 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
             "ui_style_json": {"layout_mode": "cards", "card_width": "1/3", "density": "normal"},
             "is_system": True,
         },
+        {
+            "slug": "protokoll",
+            "name": "Sitzungsprotokoll & Beschlüsse",
+            "icon": "bi-journal-check",
+            "content_type": "list",
+            "description": "Vorstands- & Mitgliederversammlungs-Protokolle inkl. Beschlüsse & PDF-Export.",
+            "use_notes": True,
+            "use_start_date": True,
+            "use_location": True,
+            "custom_fields_json": [
+                {"key": "sitzungsart", "label": "Sitzungsart", "type": "select", "options": "Vorstandssitzung, Mitgliederversammlung, Beirat", "zone": "header", "show_on_card": True},
+                {"key": "anwesende", "label": "Anwesende / Teilnehmer", "type": "text", "options": "", "zone": "header", "show_on_card": True},
+                {"key": "beschluss", "label": "Gefasster Beschluss", "type": "text", "options": "", "zone": "body", "show_on_card": True},
+                {"key": "abstimmung", "label": "Abstimmung (Ja / Nein / Enth.)", "type": "text", "options": "", "zone": "body", "show_on_card": True},
+            ],
+            "is_system": True,
+        },
     ]
     created_or_existing = []
     for item in defaults:

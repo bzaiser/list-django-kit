@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #222; margin: 2cm; }
+  h1 { font-size: 15pt; margin-bottom: 4px; }
+  .muted { color: #666; font-size: 9pt; }
+  .box { border: 1px solid #ccc; padding: 10px; margin: 12px 0; background: #fafafa; }
+</style>
+</head>
+<body>
+  <div class="muted">{{ collection.title }} · {{ data.sitzungsart|default:"Sitzungsprotokoll" }}</div>
+  <h1>{{ entry.title }}</h1>
+  <div class="muted">
+    {% if entry.start_date %}Datum: {{ entry.start_date|date:"d.m.Y H:i" }}{% endif %}
+    {% if entry.location %} · Ort: {{ entry.location }}{% endif %}
+  </div>
+  {% if data.anwesende %}<p><strong>Anwesende:</strong> {{ data.anwesende }}</p>{% endif %}
+  {% if entry.notes %}<div class="box"><strong>Protokoll / Tagesordnung:</strong><br>{{ entry.notes|linebreaks }}</div>{% endif %}
+  {% if data.beschluss %}<p><strong>Beschluss:</strong> {{ data.beschluss }}</p>{% endif %}
+  {% if data.abstimmung %}<p><strong>Abstimmungsergebnis:</strong> {{ data.abstimmung }}</p>{% endif %}
+  <p style="margin-top: 40px;">____________________________________ &nbsp;&nbsp;&nbsp;&nbsp; ____________________________________<br>
+  <span class="muted">Vorsitz / Sitzungsleitung &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Schriftführer/in</span></p>
+</body>
+</html>
