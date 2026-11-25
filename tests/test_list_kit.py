@@ -355,6 +355,20 @@ class ListKitTests(TestCase):
         self.assertEqual(len(get_published_entries(content_type="news")), 0)
         self.assertEqual(len(get_archived_entries(content_type="news")), 1)
 
+    def test_protocol_and_press_pdf_views(self):
+        from list_kit.services import seed_default_templates
+        self.client.force_login(self.user)
+        tpl_map = {t.slug: t for t in seed_default_templates()}
+        col_news = Collection.objects.create(title="Presse", template=tpl_map["news-aktuelles"], owner=self.user)
+        e_news = Entry.objects.create(collection=col_news, title="Ausstellungseröffnung", notes="Text", created_by=self.user)
+        r_press = self.client.get(reverse("list_kit:entry_press_pdf", args=[col_news.id, e_news.id]))
+        self.assertEqual(r_press.status_code, 200)
+
+        col_prot = Collection.objects.create(title="Protokolle", template=tpl_map["protokoll"], owner=self.user)
+        e_prot = Entry.objects.create(collection=col_prot, title="Sitzung 1", notes="TOP 1", created_by=self.user)
+        r_prot = self.client.get(reverse("list_kit:entry_protocol_pdf", args=[col_prot.id, e_prot.id]))
+        self.assertEqual(r_prot.status_code, 200)
+
 
 if __name__ == "__main__":
     import unittest

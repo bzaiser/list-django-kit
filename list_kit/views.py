@@ -1117,7 +1117,8 @@ def entry_press_pdf_view(request, pk, entry_id):
     if not _user_can_access_collection(request.user, col):
         return HttpResponseForbidden()
     entry = get_object_or_404(Entry, pk=entry_id, collection=col)
-    org_name = getattr(settings, "DESIGN_STUDIO_APP_NAME", "Kunstverein")
+    from django.conf import settings as django_settings
+    org_name = getattr(django_settings, "DESIGN_STUDIO_APP_NAME", "Kunstverein")
     contact_email = ""
     from django.apps import apps
     if apps.is_installed("site_kit"):
