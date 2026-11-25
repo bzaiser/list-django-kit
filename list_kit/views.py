@@ -808,7 +808,10 @@ def entry_create_person_view(request, pk, entry_id):
         from django.utils.text import slugify
 
         User = get_user_model()
-        base = slugify(f"{first}.{last}".replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")).replace("-", ".") or "mitglied"
+        raw_base = f"{first}-{last}"
+        for src, dst in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss"), ("Ä", "ae"), ("Ö", "oe"), ("Ü", "ue")):
+            raw_base = raw_base.replace(src, dst)
+        base = slugify(raw_base.replace(".", "-")).replace("-", ".").strip(".") or "mitglied"
         uname = base[:30]
         idx = 2
         while User.objects.filter(username=uname).exists():
