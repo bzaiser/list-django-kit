@@ -839,12 +839,22 @@ def entry_create_person_view(request, pk, entry_id):
     return redirect("list_kit:collection_detail", pk=col.id)
 
 
+def _sanitize_csv_cell(val):
+    s = "" if val is None else str(val)
+    stripped = s.lstrip()
+    if stripped.startswith(("=", "+", "@", "\t", "\r")):
+        return "'" + s
+    if stripped.startswith("-") and not stripped[1:].replace(".", "", 1).replace(",", "", 1).isdigit():
+        return "'" + s
+    return s
+
+
 @login_required
 def collection_export_csv_view(request, pk):
     import csv
 
     col = get_object_or_404(Collection.objects.select_related("template"), pk=pk)
-    if not _user_can_access_collection(request.user, col, write=False):
+    if not _user_can_access_collection(request.user, col, write=True):
         return HttpResponseForbidden()
     qs = col.entries.all().order_by("-created_at")
     status_filter = (request.GET.get("status") or "").strip()
@@ -860,9 +870,9 @@ def collection_export_csv_view(request, pk):
     for e in qs:
         data = e.custom_data_json if isinstance(e.custom_data_json, dict) else {}
         writer.writerow(
-            [e.title, e.status, e.created_at.strftime("%Y-%m-%d %H:%M")]
-            + [data.get(k, "") for k in cf_keys]
-            + [e.notes]
+            [_sanitize_csv_cell(e.title), _sanitize_csv_cell(e.status), e.created_at.strftime("%Y-%m-%d %H:%M")]
+            + [_sanitize_csv_cell(data.get(k, "")) for k in cf_keys]
+            + [_sanitize_csv_cell(e.notes)]
         )
     return resp
 
@@ -1154,7 +1164,7 @@ def _render_entry_pdf(template_name: str, ctx: dict, filename: str) -> HttpRespo
 @login_required
 def entry_protocol_pdf_view(request, pk, entry_id):
     col = get_object_or_404(Collection, pk=pk)
-    if not _user_can_access_collection(request.user, col):
+    if not _user_can_access_collection(request.user, col, write=True):
         return HttpResponseForbidden()
     entry = get_object_or_404(Entry, pk=entry_id, collection=col)
     return _render_entry_pdf(
@@ -1167,9 +1177,12 @@ def entry_protocol_pdf_view(request, pk, entry_id):
 @login_required
 def entry_press_pdf_view(request, pk, entry_id):
     col = get_object_or_404(Collection, pk=pk)
-    if not _user_can_access_collection(request.user, col):
+    can_write = _user_can_access_collection(request.user, col, write=True)
+    if not can_write and not _user_can_access_collection(request.user, col, write=False):
         return HttpResponseForbidden()
     entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    if not can_write and (entry.visibility != "public" or not entry.is_currently_published()):
+        return HttpResponseForbidden()
     from django.conf import settings as django_settings
     org_name = getattr(django_settings, "DESIGN_STUDIO_APP_NAME", "Kunstverein")
     contact_email = ""

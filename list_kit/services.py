@@ -217,14 +217,114 @@ def seed_default_templates(db_alias: str = "default") -> list[ListTemplate]:
     return created_or_existing
 
 
+_ALLOWED_RICH_TAGS = {
+    "p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li",
+    "h1", "h2", "h3", "h4", "blockquote", "a", "span", "div", "font",
+    "img", "hr", "table", "thead", "tbody", "tr", "th", "td",
+}
+_VOID_RICH_TAGS = {"br", "hr", "img"}
+_STRIP_RICH_VOID_TAGS = {"embed"}
+_STRIP_RICH_CONTENT_TAGS = {"script", "style", "iframe", "object", "svg", "form"}
+_ALLOWED_RICH_STYLES = {
+    "color", "background-color", "text-align", "font-weight", "font-style",
+    "text-decoration", "max-width", "width", "height", "border-radius",
+}
+
+
+def _sanitize_rich_style(raw_style: str) -> str:
+    safe_parts = []
+    for decl in (raw_style or "").split(";"):
+        if ":" not in decl:
+            continue
+        prop, val = decl.split(":", 1)
+        prop_l = prop.strip().lower()
+        val_s = val.strip()
+        if prop_l not in _ALLOWED_RICH_STYLES or not val_s or "\\" in val_s:
+            continue
+        val_l = val_s.lower()
+        if any(bad in val_l for bad in ("url(", "expression(", "javascript:", "@import")):
+            continue
+        safe_parts.append(f"{prop_l}: {val_s}")
+    return "; ".join(safe_parts)
+
+
 def sanitize_rich_html(raw_html: str) -> str:
     """Allow safe WYSIWYG formatting tags while stripping scripts and event handlers."""
     if not raw_html:
         return ""
-    cleaned = re.sub(r"(?is)<(script|style|iframe|object|embed)[^>]*>.*?</\1>", "", raw_html)
-    cleaned = re.sub(r"(?is)\son[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", cleaned)
-    cleaned = re.sub(r"(?is)(href|src)\s*=\s*([\"'])\s*javascript:[^\"']*\2", r'\1=\2#\2', cleaned)
-    return cleaned.strip()
+    from html.parser import HTMLParser
+
+    class _Parser(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=False)
+            self.out = []
+            self._skip = 0
+
+        def handle_starttag(self, tag, attrs):
+            t = tag.lower()
+            if t in _STRIP_RICH_VOID_TAGS:
+                return
+            if t in _STRIP_RICH_CONTENT_TAGS:
+                self._skip += 1
+                return
+            if self._skip > 0 or t not in _ALLOWED_RICH_TAGS:
+                return
+            clean = []
+            for k, v in attrs:
+                kl = (k or "").lower()
+                if kl == "class" and v:
+                    sc = re.sub(r"[^A-Za-z0-9 _-]", "", v).strip()
+                    if sc:
+                        clean.append(f'class="{html.escape(sc, quote=True)}"')
+                elif kl == "style" and v:
+                    ss = _sanitize_rich_style(v)
+                    if ss:
+                        clean.append(f'style="{html.escape(ss, quote=True)}"')
+                elif t == "font" and kl == "color" and v:
+                    ss = _sanitize_rich_style(f"color: {v}")
+                    if ss:
+                        clean.append(f'style="{html.escape(ss, quote=True)}"')
+                elif t == "a" and kl == "href" and v:
+                    vl = v.strip()
+                    if vl.lower().startswith(("http://", "https://", "mailto:", "tel:", "#")) or (vl.startswith("/") and not vl.startswith("//")):
+                        clean.append(f'href="{html.escape(vl, quote=True)}"')
+                elif t == "a" and kl == "target" and v in ("_blank", "_self"):
+                    clean.append(f'target="{v}"')
+                elif t == "img" and kl == "src" and v:
+                    vl = v.strip()
+                    if vl.lower().startswith(("http://", "https://", "data:image/")) or (vl.startswith("/") and not vl.startswith("//")):
+                        clean.append(f'src="{html.escape(vl, quote=True)}"')
+                elif t == "img" and kl == "alt" and v is not None:
+                    clean.append(f'alt="{html.escape(v, quote=True)}"')
+            attr_str = (" " + " ".join(clean)) if clean else ""
+            self.out.append(f"<{t}{attr_str}>")
+
+        def handle_endtag(self, tag):
+            t = tag.lower()
+            if t in _STRIP_RICH_CONTENT_TAGS:
+                if self._skip > 0:
+                    self._skip -= 1
+                return
+            if self._skip > 0 or t not in _ALLOWED_RICH_TAGS or t in _VOID_RICH_TAGS:
+                return
+            self.out.append(f"</{t}>")
+
+        def handle_data(self, data):
+            if self._skip == 0:
+                self.out.append(html.escape(data, quote=False))
+
+        def handle_entityref(self, name):
+            if self._skip == 0:
+                self.out.append(f"&{name};")
+
+        def handle_charref(self, name):
+            if self._skip == 0:
+                self.out.append(f"&#{name};")
+
+    p = _Parser()
+    p.feed(raw_html)
+    p.close()
+    return "".join(p.out).strip()
 
 
 def render_safe_markdown(text: str) -> str:
