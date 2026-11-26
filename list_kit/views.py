@@ -125,11 +125,11 @@ def collection_detail_view(request, pk):
     if col.template.content_type == "form_inbox":
         def _status_bucket(entry_obj):
             st = (entry_obj.status or "Offen").strip().lower()
-            if st in ("abgesagt", "abgelehnt"):
+            if st in ("abgesagt", "abgelehnt", "cancelled"):
                 return "abgesagt"
-            if st == "bestätigt":
+            if st in ("bestätigt", "confirmed"):
                 return "bestaetigt"
-            if st == "teilgenommen":
+            if st in ("teilgenommen", "attended"):
                 return "teilgenommen"
             return "offen"
 
@@ -647,6 +647,19 @@ def public_submit_view(request, pk):
     next_url = (request.POST.get("next") or "").strip()
     if next_url and next_url.startswith("/"):
         return redirect(next_url)
+    return redirect("list_kit:collection_detail", pk=col.id)
+
+
+@login_required
+@require_POST
+def entry_archive_view(request, pk, entry_id):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return HttpResponseForbidden()
+    entry = get_object_or_404(Entry, pk=entry_id, collection=col)
+    entry.expires_at = timezone.now()
+    entry.save(update_fields=["expires_at", "updated_at"])
+    messages.success(request, f"Eintrag „{entry.title}“ ins Archiv verschoben.")
     return redirect("list_kit:collection_detail", pk=col.id)
 
 

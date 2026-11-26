@@ -421,7 +421,7 @@ def get_site_page_choices() -> list[dict]:
         if not apps.is_installed("site_kit"):
             return pages
         from site_kit.models import PublicPage
-        for p in PublicPage.objects.filter(is_published=True).order_by("-is_home", "nav_order", "title"):
+        for p in PublicPage.objects.filter(is_published=True).order_by("-is_home", "menu_order", "title"):
             url = "/" if p.is_home else f"/seite/{p.slug}/"
             pages.append({"url": url, "label": p.title})
         for std_url, std_label in (("/news/", "News (Übersicht)"), ("/termine/", "Termine (Übersicht)"), ("/programm/", "Jahresprogramm")):

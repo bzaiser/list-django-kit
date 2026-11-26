@@ -26,6 +26,7 @@ urlpatterns = [
     path("<uuid:pk>/entries/<int:entry_id>/protocol.pdf", views.entry_protocol_pdf_view, name="entry_protocol_pdf"),
     path("<uuid:pk>/entries/<int:entry_id>/press.pdf", views.entry_press_pdf_view, name="entry_press_pdf"),
     path("<uuid:pk>/entries/<int:entry_id>/toggle/", views.entry_toggle_view, name="entry_toggle"),
+    path("<uuid:pk>/entries/<int:entry_id>/archive/", views.entry_archive_view, name="entry_archive"),
     path("<uuid:pk>/entries/<int:entry_id>/images/<int:image_id>/toggle/", views.entry_image_toggle_view, name="entry_image_toggle"),
     path("<uuid:pk>/entries/<int:entry_id>/delete/", views.entry_delete_view, name="entry_delete"),
 ]

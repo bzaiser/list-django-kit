@@ -196,13 +196,8 @@
                         {% endif %}
                         {% endif %}
                         {% if template.content_type == 'news' and news_view_mode != 'archive' %}
-                        <form method="post" action="{% url 'list_kit:entry_edit' collection.id entry.id %}" class="d-inline">
+                        <form method="post" action="{% url 'list_kit:entry_archive' collection.id entry.id %}" class="d-inline">
                             {% csrf_token %}
-                            <input type="hidden" name="title" value="{{ entry.title }}">
-                            <input type="hidden" name="notes" value="{{ entry.notes }}">
-                            <input type="hidden" name="visibility" value="{{ entry.visibility }}">
-                            {% if entry.is_pinned %}<input type="hidden" name="is_pinned" value="on">{% endif %}
-                            <input type="hidden" name="archive_now" value="1">
                             <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Sofort ins Archiv"><i class="bi bi-archive"></i></button>
                         </form>
                         {% endif %}
