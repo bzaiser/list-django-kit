@@ -382,6 +382,7 @@ def get_published_entries(content_type: str | None = None, collection_slug: str 
     now = timezone.now()
     qs = (
         Entry.objects.select_related("collection", "collection__template", "created_by")
+        .prefetch_related("images")
         .filter(collection__is_public=True, visibility="public")
         .filter(Q(publish_at__isnull=True) | Q(publish_at__lte=now))
         .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
@@ -401,6 +402,7 @@ def get_archived_entries(content_type: str | None = "news", year: int | None = N
     now = timezone.now()
     qs = (
         Entry.objects.select_related("collection", "collection__template", "created_by")
+        .prefetch_related("images")
         .filter(collection__is_public=True, visibility="public", expires_at__isnull=False, expires_at__lte=now)
     )
     if content_type:
