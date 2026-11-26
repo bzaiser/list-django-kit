@@ -71,9 +71,9 @@
             <input type="hidden" name="existing_document_present_{{ doc.id }}" value="1">
             <a href="{{ doc.file.url }}" download class="small text-truncate text-decoration-none"><i class="bi bi-file-earmark-text me-1"></i>{{ doc.filename }}</a>
             <div class="d-flex align-items-center gap-3 flex-shrink-0">
-                <div class="form-check mb-0">
+                <div class="form-check mb-0 px-2 py-1 rounded bg-warning-subtle border border-warning-subtle">
                     <input type="checkbox" name="existing_document_public_{{ doc.id }}" id="pubDoc-{{ entry.id }}-{{ doc.id }}" class="form-check-input" {% if doc.is_public %}checked{% endif %}>
-                    <label class="form-check-label small" for="pubDoc-{{ entry.id }}-{{ doc.id }}">Öffentlich</label>
+                    <label class="form-check-label small fw-semibold" for="pubDoc-{{ entry.id }}-{{ doc.id }}"><i class="bi bi-globe2 me-1 text-warning-emphasis"></i>Öffentlich</label>
                 </div>
                 <div class="form-check mb-0">
                     <input type="checkbox" name="delete_document_ids" value="{{ doc.id }}" id="delDoc-{{ entry.id }}-{{ doc.id }}" class="form-check-input">

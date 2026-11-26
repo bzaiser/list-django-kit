@@ -302,12 +302,14 @@
                     </div>
                     {% endif %}
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold">Sichtbarkeit</label>
-                        <select name="visibility" class="form-select">
-                            {% for vk, vl in visibility_choices %}
-                            <option value="{{ vk }}" {% if vk == 'public' and template.content_type == 'news' %}selected{% elif vk == 'internal' and template.content_type != 'news' %}selected{% endif %}>{{ vl }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="ds-risk-public">
+                            <label class="form-label fw-semibold small mb-1"><i class="bi bi-globe2 me-1 text-warning-emphasis"></i>Sichtbarkeit <span class="badge text-bg-warning ms-1">Öffentlich bei „Öffentlich“</span></label>
+                            <select name="visibility" class="form-select">
+                                {% for vk, vl in visibility_choices %}
+                                <option value="{{ vk }}" {% if vk == 'public' and template.content_type == 'news' %}selected{% elif vk == 'internal' and template.content_type != 'news' %}selected{% endif %}>{{ vl }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                 </div>
                 {% if template.content_type == 'news' %}
@@ -414,12 +416,14 @@
                     </div>
                     {% endif %}
                     <div class="col-md-6">
-                        <label class="form-label fw-semibold">Sichtbarkeit</label>
-                        <select name="visibility" class="form-select">
-                            {% for vk, vl in visibility_choices %}
-                            <option value="{{ vk }}" {% if entry.visibility == vk %}selected{% endif %}>{{ vl }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="ds-risk-public">
+                            <label class="form-label fw-semibold small mb-1"><i class="bi bi-globe2 me-1 text-warning-emphasis"></i>Sichtbarkeit <span class="badge text-bg-warning ms-1">Öffentlich bei „Öffentlich“</span></label>
+                            <select name="visibility" class="form-select">
+                                {% for vk, vl in visibility_choices %}
+                                <option value="{{ vk }}" {% if entry.visibility == vk %}selected{% endif %}>{{ vl }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                 </div>
                 {% if template.content_type == 'news' %}
