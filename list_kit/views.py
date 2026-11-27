@@ -287,7 +287,7 @@ def collection_detail_view(request, pk):
 @require_POST
 def collection_delete_view(request, pk):
     col = get_object_or_404(Collection, pk=pk)
-    if (col.owner_id != request.user.id or not _can_manage_collections(request.user)) and not request.user.is_superuser:
+    if not (request.user.is_staff or request.user.is_superuser or (col.owner_id == request.user.id and _can_manage_collections(request.user))):
         return HttpResponseForbidden()
     title = col.title
     col.delete()
@@ -1272,11 +1272,8 @@ def builder_import_view(request):
 @require_POST
 def builder_delete_view(request, pk):
     tpl = get_object_or_404(ListTemplate, pk=pk)
-    if tpl.is_system:
-        messages.warning(request, "System-Vorlagen können nicht gelöscht werden.")
-        return redirect("list_kit:builder_list")
     if tpl.collections.exists():
-        messages.warning(request, "Vorlage wird noch von Sammlungen verwendet.")
+        messages.warning(request, "Vorlage wird noch von Sammlungen/Listen verwendet. Bitte zuerst die verknüpfte Liste löschen.")
         return redirect("list_kit:builder_list")
     name = tpl.name
     tpl.delete()

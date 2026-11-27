@@ -33,12 +33,10 @@
                     <div class="btn-group btn-group-sm">
                         <a href="{% url 'list_kit:builder_edit' tpl.id %}" class="btn btn-outline-primary"><i class="bi bi-pencil"></i></a>
                         <a href="{% url 'list_kit:builder_export' tpl.id %}" class="btn btn-outline-secondary" title="Export JSON"><i class="bi bi-download"></i></a>
-                        {% if not tpl.is_system %}
-                        <form method="post" action="{% url 'list_kit:builder_delete' tpl.id %}" class="d-inline">
+                        <form method="post" action="{% url 'list_kit:builder_delete' tpl.id %}" class="d-inline" onsubmit="return confirm('Vorlage wirklich löschen?');">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Löschen"><i class="bi bi-trash3"></i></button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="{% if tpl.collection_count %}Zuerst verknüpfte Liste(n) löschen{% else %}Vorlage löschen{% endif %}" {% if tpl.collection_count %}disabled{% endif %}><i class="bi bi-trash3"></i></button>
                         </form>
-                        {% endif %}
                     </div>
                 </div>
             </div>

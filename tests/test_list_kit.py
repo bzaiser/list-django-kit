@@ -500,6 +500,25 @@ class ListKitTests(TestCase):
         self.assertEqual(tpl.custom_fields_json[0]["width"], "half")
         self.assertEqual(tpl.custom_fields_json[0]["section"], "Person")
 
+    def test_collection_and_system_template_delete(self):
+        from django.contrib.auth import get_user_model
+        other = get_user_model().objects.create_user(username="other_owner", password="x")
+        self.client.force_login(self.staff)
+        tpl = ListTemplate.objects.create(name="SysTpl", slug="sys-del-tpl", content_type="form_inbox", is_system=True)
+        col = Collection.objects.create(title="SysCol", slug="sys-del-col", template=tpl, owner=other, is_public=True)
+        # Cannot delete template while collection exists
+        r_blk = self.client.post(reverse("list_kit:builder_delete", args=[tpl.id]))
+        self.assertEqual(r_blk.status_code, 302)
+        self.assertTrue(ListTemplate.objects.filter(id=tpl.id).exists())
+        # Staff can delete collection even if owned by another user
+        r_col = self.client.post(reverse("list_kit:collection_delete", args=[col.id]))
+        self.assertEqual(r_col.status_code, 302)
+        self.assertFalse(Collection.objects.filter(id=col.id).exists())
+        # Now template (even is_system=True) can be deleted
+        r_tpl = self.client.post(reverse("list_kit:builder_delete", args=[tpl.id]))
+        self.assertEqual(r_tpl.status_code, 302)
+        self.assertFalse(ListTemplate.objects.filter(id=tpl.id).exists())
+
 
 if __name__ == "__main__":
     import unittest
