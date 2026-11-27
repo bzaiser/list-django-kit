@@ -55,6 +55,10 @@
             <textarea name="json_payload" rows="3" class="form-control form-control-sm font-monospace" placeholder='{"name": "Meine Vorlage", "content_type": "list", ...}'></textarea>
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <input type="file" name="json_file" accept=".json" class="form-control form-control-sm w-auto">
+                <label class="form-check small m-0">
+                    <input type="checkbox" name="update_existing" value="1" class="form-check-input">
+                    <span class="form-check-label">{% trans "Bestehende Vorlage mit gleichem Slug überschreiben" %}</span>
+                </label>
                 <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">{% trans "Importieren" %}</button>
             </div>
         </form>

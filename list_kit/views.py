@@ -1020,6 +1020,8 @@ def builder_edit_view(request, pk=None):
         cf_options = request.POST.getlist("cf_options")
         cf_zones = request.POST.getlist("cf_zone")
         cf_show_cards = request.POST.getlist("cf_show_card")
+        cf_widths = request.POST.getlist("cf_width")
+        cf_sections = request.POST.getlist("cf_section")
         allowed_cf_types = (
             "text", "textarea", "markdown", "wysiwyg", "number", "currency", "date", "url", "page_link",
             "image", "select", "radio", "multiselect", "checkbox", "rating", "color",
@@ -1037,14 +1039,21 @@ def builder_edit_view(request, pk=None):
             show_on_card = (cf_show_cards[idx] != "0") if idx < len(cf_show_cards) else (zone != "hidden")
             if not show_on_card:
                 zone = "hidden"
-            custom_fields.append({
+            cf_item = {
                 "key": k_clean,
                 "label": lbl_clean,
                 "type": ftype,
                 "options": opts,
                 "zone": zone,
                 "show_on_card": show_on_card,
-            })
+            }
+            width_val = cf_widths[idx].strip() if idx < len(cf_widths) else ""
+            if width_val in ("half", "full"):
+                cf_item["width"] = width_val
+            sec_val = cf_sections[idx].strip() if idx < len(cf_sections) else ""
+            if sec_val:
+                cf_item["section"] = sec_val
+            custom_fields.append(cf_item)
         tpl.custom_fields_json = custom_fields
 
         layout_mode = request.POST.get("ui_layout_mode", "row")
@@ -1237,22 +1246,25 @@ def builder_import_view(request):
         except Exception:
             pass
 
-    tpl = ListTemplate(
-        name=str(data["name"])[:120],
-        icon=str(data.get("icon") or "bi-card-checklist")[:40],
-        description=str(data.get("description") or ""),
-        content_type=ctype,
-        custom_fields_json=data.get("custom_fields_json") or [],
-        allowed_statuses_json=data.get("allowed_statuses_json") or [],
-        ui_style_json=ui_style,
-        summary_rule_json=data.get("summary_rule_json") or {},
-    )
+    slug_val = str(data.get("slug") or "").strip()[:80]
+    update_existing = request.POST.get("update_existing") == "1"
+    tpl = ListTemplate.objects.filter(slug=slug_val).first() if (update_existing and slug_val) else None
+    if tpl is None:
+        tpl = ListTemplate()
+    tpl.name = str(data["name"])[:120]
+    tpl.icon = str(data.get("icon") or "bi-card-checklist")[:40]
+    tpl.description = str(data.get("description") or "")
+    tpl.content_type = ctype
+    tpl.custom_fields_json = data.get("custom_fields_json") or []
+    tpl.allowed_statuses_json = data.get("allowed_statuses_json") or []
+    tpl.ui_style_json = ui_style
+    tpl.summary_rule_json = data.get("summary_rule_json") or {}
     flags = data.get("flags") or {}
     for f in FIELD_DEFS:
         if f["key"] in flags:
             setattr(tpl, f["key"], bool(flags[f["key"]]))
     tpl.save()
-    messages.success(request, f"Vorlage „{tpl.name}“ importiert.")
+    messages.success(request, f"Vorlage „{tpl.name}“ {'aktualisiert' if update_existing and slug_val else 'importiert'}.")
     return redirect("list_kit:builder_edit", pk=tpl.id)
 
 

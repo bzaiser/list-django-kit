@@ -474,6 +474,32 @@ class ListKitTests(TestCase):
         self.assertTrue(entry.custom_data_json["satzung_akzeptiert"])
         self.assertEqual(entry.custom_data_json["portal_zugang"], "Ja")
 
+    def test_builder_import_update_existing_by_slug_and_preserves_width_section(self):
+        self.client.force_login(self.staff)
+        tpl = ListTemplate.objects.create(
+            name="Alt",
+            slug="mein-antrag",
+            content_type="form_inbox",
+            custom_fields_json=[],
+        )
+        payload = json.dumps({
+            "name": "Neu",
+            "slug": "mein-antrag",
+            "content_type": "form_inbox",
+            "custom_fields_json": [
+                {"key": "nachname", "label": "Name", "type": "text", "options": "", "zone": "body", "show_on_card": True, "width": "half", "section": "Person"},
+            ],
+        })
+        r = self.client.post(reverse("list_kit:builder_import"), {
+            "json_payload": payload,
+            "update_existing": "1",
+        })
+        self.assertEqual(r.status_code, 302)
+        tpl.refresh_from_db()
+        self.assertEqual(tpl.name, "Neu")
+        self.assertEqual(tpl.custom_fields_json[0]["width"], "half")
+        self.assertEqual(tpl.custom_fields_json[0]["section"], "Person")
+
 
 if __name__ == "__main__":
     import unittest

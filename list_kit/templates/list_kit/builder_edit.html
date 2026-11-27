@@ -403,6 +403,8 @@
                 '<input type="hidden" name="cf_key" value="' + (cf.key || '') + '">' +
                 '<input type="hidden" name="cf_zone" value="' + (cf.zone || 'body') + '">' +
                 '<input type="hidden" name="cf_show_card" value="' + (cf.show_on_card === false ? '0' : '1') + '">' +
+                '<input type="hidden" name="cf_width" value="' + (cf.width || '').replace(/"/g, '&quot;') + '">' +
+                '<input type="hidden" name="cf_section" value="' + (cf.section || '').replace(/"/g, '&quot;') + '">' +
                 '<select name="cf_type" class="form-select form-select-sm w-auto">' + optsHtml + '</select>' +
                 '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 lk-del-cf">&times;</button>' +
                 '</div>' +
