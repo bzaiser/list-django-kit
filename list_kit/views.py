@@ -1001,8 +1001,14 @@ def builder_edit_view(request, pk=None):
         if ctype in dict(ListTemplate.CONTENT_TYPE_CHOICES):
             tpl.content_type = ctype
 
-        for fdef in FIELD_DEFS:
-            setattr(tpl, fdef["key"], request.POST.get(fdef["key"]) == "on")
+        is_form_editor = request.POST.get("form_editor_mode") == "1"
+        if is_form_editor:
+            tpl.content_type = "form_inbox"
+            for fdef in FIELD_DEFS:
+                setattr(tpl, fdef["key"], fdef["key"] in ("use_notes", "use_status"))
+        else:
+            for fdef in FIELD_DEFS:
+                setattr(tpl, fdef["key"], request.POST.get(fdef["key"]) == "on")
 
         # Statuses
         s_keys = request.POST.getlist("status_key")
@@ -1029,7 +1035,7 @@ def builder_edit_view(request, pk=None):
         cf_widths = request.POST.getlist("cf_width")
         cf_sections = request.POST.getlist("cf_section")
         allowed_cf_types = (
-            "text", "textarea", "markdown", "wysiwyg", "number", "currency", "date", "url", "page_link",
+            "text", "email", "textarea", "markdown", "wysiwyg", "number", "currency", "date", "url", "page_link",
             "image", "select", "radio", "multiselect", "checkbox", "rating", "color",
         )
         custom_fields = []
@@ -1043,7 +1049,9 @@ def builder_edit_view(request, pk=None):
             opts = cf_options[idx].strip() if idx < len(cf_options) else ""
             zone = cf_zones[idx].strip() if idx < len(cf_zones) and cf_zones[idx].strip() in ("header", "body", "footer", "hidden") else "body"
             show_on_card = (cf_show_cards[idx] != "0") if idx < len(cf_show_cards) else (zone != "hidden")
-            if not show_on_card:
+            if is_form_editor:
+                zone = "body"
+            elif not show_on_card:
                 zone = "hidden"
             cf_item = {
                 "key": k_clean,
@@ -1150,7 +1158,8 @@ def builder_edit_view(request, pk=None):
     initial_content_type = (request.GET.get("type") or "").strip() if tpl is None else tpl.content_type
     if initial_content_type not in dict(ListTemplate.CONTENT_TYPE_CHOICES):
         initial_content_type = "list"
-    has_inbox_collection = Collection.objects.filter(template=tpl).exists() if tpl else False
+    inbox_collection = Collection.objects.filter(template=tpl).first() if tpl else None
+    has_inbox_collection = inbox_collection is not None
 
     active_keys = [f["key"] for f in FIELD_DEFS if (getattr(tpl, f["key"], False) if tpl else f["key"] in ("use_notes", "use_status"))]
     ui_style = tpl.get_ui_style() if tpl else {
@@ -1166,10 +1175,12 @@ def builder_edit_view(request, pk=None):
         {"key": "done", "label": "Erledigt", "completes": True},
     ]
     custom_fields = tpl.custom_fields_json if (tpl and isinstance(tpl.custom_fields_json, list)) else []
-    return render(request, "list_kit/builder_edit.html", {
+    tpl_name = "list_kit/builder_form_edit.html" if initial_content_type == "form_inbox" else "list_kit/builder_edit.html"
+    return render(request, tpl_name, {
         "tpl": tpl,
         "initial_content_type": initial_content_type,
         "has_inbox_collection": has_inbox_collection,
+        "inbox_collection": inbox_collection,
         "field_defs_json": json.dumps(FIELD_DEFS),
         "active_keys_json": json.dumps(active_keys),
         "custom_fields_json": json.dumps(custom_fields),

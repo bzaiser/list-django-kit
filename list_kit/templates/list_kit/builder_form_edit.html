@@ -1,0 +1,303 @@
+{% extends "design_studio/layouts/base.html" %}
+{% load i18n %}
+
+{% block title %}{% if tpl %}Formular: {{ tpl.name }}{% else %}Neues Formular{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h1 class="h4 fw-bold mb-0"><i class="bi bi-envelope-paper me-2 text-primary"></i>{% if tpl %}Formular bearbeiten: {{ tpl.name }}{% else %}Neues Formular erstellen{% endif %}</h1>
+        <div class="small text-muted">Alle Felder erscheinen automatisch im öffentlichen Formular. Mit „In Eingangsliste anzeigen“ steuerst du nur die kompakte Übersicht im Backend.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if inbox_collection %}
+        <a href="{% url 'list_kit:collection_detail' inbox_collection.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+            <i class="bi bi-inbox me-1"></i>Eingänge ansehen
+        </a>
+        {% if inbox_collection.allow_public_submit %}
+        <a href="/formular/{{ inbox_collection.slug }}/" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Öffentliches Formular
+        </a>
+        {% endif %}
+        {% endif %}
+        <a href="{% url 'list_kit:collection_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">{% trans "Zurück" %}</a>
+    </div>
+</div>
+
+{% if tpl and not has_inbox_collection %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 px-3 mb-3">
+    <span class="small"><i class="bi bi-inbox me-1"></i>Dieses Formular hat noch keine verknüpfte Eingangsliste.</span>
+    <form method="post" action="{% url 'list_kit:builder_create_inbox' tpl.id %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3"><i class="bi bi-plus-circle me-1"></i>Eingangsliste jetzt erstellen</button>
+    </form>
+</div>
+{% endif %}
+
+<form method="post" id="lkFormBuilder">
+    {% csrf_token %}
+    <input type="hidden" name="form_editor_mode" value="1">
+    <input type="hidden" name="content_type" value="form_inbox">
+
+    <div class="row g-3 align-items-start">
+        <!-- Links: Formular-Einstellungen & Felder -->
+        <div class="col-12 col-lg-7 d-flex flex-column gap-3">
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold"><i class="bi bi-sliders me-1 text-primary"></i>Basis &amp; Einleitungstext</div>
+                <div class="card-body p-3 d-flex flex-column gap-2">
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold mb-1">Formular-Name</label>
+                            <input type="text" name="name" id="lk-f-name" class="form-control form-control-sm" value="{{ tpl.name|default:'' }}" required placeholder="z. B. Mitgliedsantrag">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">Icon (Bootstrap Icon)</label>
+                            <input type="text" name="icon" class="form-control form-control-sm" value="{{ tpl.icon|default:'bi-envelope-paper' }}" placeholder="bi-person-plus">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1">Einleitungstext über dem Formular (optional)</label>
+                        <textarea name="description" id="lk-f-desc" rows="2" class="form-control form-control-sm" placeholder="z. B. Hiermit beantrage ich die Aufnahme in den [[ORG_NAME]].">{{ tpl.description|default:'' }}</textarea>
+                        <div class="form-text small">Platzhalter: <code>[[ORG_NAME]]</code>, <code>[[ORG_ADDRESS]]</code>, <code>[[ORG_EMAIL]]</code></div>
+                    </div>
+                    {% if not tpl %}
+                    <div class="form-check form-switch mt-1">
+                        <input type="checkbox" name="create_inbox" value="1" class="form-check-input" id="lk-create-inbox" checked>
+                        <label class="form-check-label small fw-semibold" for="lk-create-inbox">Öffentliche Eingangsliste (/formular/…/) direkt mit anlegen</label>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="bi bi-ui-checks me-1 text-primary"></i>Formularfelder</span>
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" id="lk-add-field-btn">
+                        <i class="bi bi-plus-lg me-1"></i>Feld hinzufügen
+                    </button>
+                </div>
+                <div class="card-body p-3 d-flex flex-column gap-2" id="lk-form-fields-box"></div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold"><i class="bi bi-file-earmark-pdf me-1 text-primary"></i>PDF-Export-Einstellungen (optional)</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#lk-pdf-cfg">
+                        <i class="bi bi-chevron-expand"></i>
+                    </button>
+                </div>
+                <div id="lk-pdf-cfg" class="collapse">
+                    <div class="card-body p-3 d-flex flex-column gap-2">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small mb-1">Ausrichtung</label>
+                                <select name="pdf_orientation" class="form-select form-select-sm">
+                                    <option value="portrait" {% if ui_style.pdf.orientation != 'landscape' %}selected{% endif %}>A4 Hochformat</option>
+                                    <option value="landscape" {% if ui_style.pdf.orientation == 'landscape' %}selected{% endif %}>A4 Querformat</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1">Einträge</label>
+                                <select name="pdf_filter" class="form-select form-select-sm">
+                                    <option value="all" {% if ui_style.pdf.filter == 'all' or not ui_style.pdf.filter %}selected{% endif %}>Alle</option>
+                                    <option value="open" {% if ui_style.pdf.filter == 'open' %}selected{% endif %}>Nur offene</option>
+                                    <option value="done" {% if ui_style.pdf.filter == 'done' %}selected{% endif %}>Nur erledigte</option>
+                                </select>
+                            </div>
+                        </div>
+                        <input type="hidden" name="pdf_include_summary" value="on">
+                        <input type="hidden" name="pdf_include_notes" value="on">
+                        <input type="hidden" name="pdf_include_custom_fields" value="on">
+                        <input type="hidden" name="pdf_include_dates" value="on">
+                        <input type="text" name="pdf_footer_text" class="form-control form-control-sm" value="{{ ui_style.pdf.footer_text|default:'' }}" placeholder="Optionaler Fußzeilentext im PDF">
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-success rounded-pill px-4 fw-semibold">
+                    <i class="bi bi-check-lg me-1"></i>Formular speichern
+                </button>
+            </div>
+        </div>
+
+        <!-- Rechts: Echte 2-Spalten-Formular-Vorschau -->
+        <div class="col-12 col-lg-5" style="position: sticky; top: 1rem;">
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-eye me-1 text-primary"></i>Live-Vorschau (Öffentliches Formular)</span>
+                    <span class="badge bg-body-secondary text-body border small" id="lk-field-count">0 Felder</span>
+                </div>
+                <div class="card-body p-3">
+                    <h2 class="h5 fw-bold mb-2" id="lk-prev-title">{{ tpl.name|default:"Neues Formular" }}</h2>
+                    <div class="small text-muted bg-body-tertiary border rounded-2 p-2 mb-3 d-none" id="lk-prev-desc"></div>
+                    <div class="row g-2" id="lk-prev-fields"></div>
+                    <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
+                        <span class="small text-muted">+ Betreff &amp; Bemerkungen</span>
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" disabled>Absenden</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+(function () {
+    let fields = {{ custom_fields_json|safe }};
+    const typeChoices = [
+        ['text', 'Text (einzeilig)'],
+        ['email', 'E-Mail'],
+        ['textarea', 'Mehrzeilig'],
+        ['radio', 'Radio-Buttons'],
+        ['select', 'Dropdown (Auswahl)'],
+        ['multiselect', 'Mehrfachauswahl'],
+        ['checkbox', 'Checkbox (Ja/Nein)'],
+        ['date', 'Datum'],
+        ['currency', 'Betrag (€)'],
+        ['number', 'Zahl'],
+        ['url', 'Link / URL'],
+    ];
+
+    const box = document.getElementById('lk-form-fields-box');
+    const prevBox = document.getElementById('lk-prev-fields');
+    const prevTitle = document.getElementById('lk-prev-title');
+    const prevDesc = document.getElementById('lk-prev-desc');
+    const countBadge = document.getElementById('lk-field-count');
+    const nameInp = document.getElementById('lk-f-name');
+    const descInp = document.getElementById('lk-f-desc');
+
+    function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function renderPreview() {
+        prevTitle.textContent = (nameInp.value || '').trim() || 'Neues Formular';
+        const d = (descInp.value || '').trim();
+        prevDesc.textContent = d;
+        prevDesc.classList.toggle('d-none', !d);
+        countBadge.textContent = fields.length + ' Felder';
+
+        prevBox.innerHTML = '';
+        if (!fields.length) {
+            prevBox.innerHTML = '<div class="col-12 text-muted small">Noch keine Formularfelder angelegt.</div>';
+            return;
+        }
+        fields.forEach(cf => {
+            if (cf.section && cf.section.trim()) {
+                const sec = document.createElement('div');
+                sec.className = 'col-12 border-top pt-2 mt-1';
+                sec.innerHTML = '<div class="small fw-bold text-uppercase text-muted">' + esc(cf.section) + '</div>';
+                prevBox.appendChild(sec);
+            }
+            const col = document.createElement('div');
+            col.className = cf.width === 'half' ? 'col-12 col-sm-6' : 'col-12';
+            const lbl = esc(cf.label || '(Unbenanntes Feld)');
+            const opts = (cf.options || '').split(',').map(x => x.trim()).filter(Boolean);
+            let ctrl = '<input type="text" class="form-control form-control-sm" disabled>';
+            if (cf.type === 'textarea') {
+                ctrl = '<textarea rows="2" class="form-control form-control-sm" disabled></textarea>';
+            } else if (cf.type === 'checkbox') {
+                col.innerHTML = '<div class="form-check"><input type="checkbox" class="form-check-input" disabled><label class="form-check-label small">' + lbl + '</label></div>';
+                prevBox.appendChild(col);
+                return;
+            } else if (cf.type === 'radio') {
+                ctrl = '<div class="d-flex flex-wrap gap-2">' + (opts.length ? opts : ['Option 1', 'Option 2']).map(o =>
+                    '<div class="form-check form-check-inline m-0"><input type="radio" class="form-check-input" disabled><label class="form-check-label small">' + esc(o) + '</label></div>'
+                ).join('') + '</div>';
+            } else if (cf.type === 'select' || cf.type === 'multiselect') {
+                ctrl = '<select class="form-select form-select-sm" disabled><option>' + (opts[0] ? esc(opts[0]) : '— Bitte wählen —') + '</option></select>';
+            } else if (cf.type === 'date') {
+                ctrl = '<input type="date" class="form-control form-control-sm" disabled>';
+            } else if (cf.type === 'email') {
+                ctrl = '<input type="email" class="form-control form-control-sm" placeholder="name@beispiel.de" disabled>';
+            } else if (cf.type === 'currency') {
+                ctrl = '<input type="number" class="form-control form-control-sm" placeholder="0,00 €" disabled>';
+            }
+            col.innerHTML = '<label class="form-label small fw-semibold mb-1">' + lbl + '</label>' + ctrl;
+            prevBox.appendChild(col);
+        });
+    }
+
+    function renderEditor() {
+        box.innerHTML = '';
+        if (!fields.length) {
+            box.innerHTML = '<div class="text-muted small py-2">Klicke oben auf „Feld hinzufügen“, um dein erstes Formularfeld anzulegen.</div>';
+        }
+        fields.forEach((cf, idx) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'border rounded-3 p-2 bg-body-tertiary d-flex flex-column gap-2';
+            const needsOpts = ['select', 'radio', 'multiselect'].includes(cf.type || 'text');
+            const showCard = cf.show_on_card !== false;
+            const optsHtml = typeChoices.map(tc =>
+                '<option value="' + tc[0] + '"' + ((cf.type || 'text') === tc[0] ? ' selected' : '') + '>' + tc[1] + '</option>'
+            ).join('');
+
+            wrap.innerHTML =
+                '<div class="d-flex gap-1 align-items-center">' +
+                '<div class="btn-group btn-group-sm">' +
+                '<button type="button" class="btn btn-outline-secondary py-0 px-1 lk-up" title="Nach oben"' + (idx === 0 ? ' disabled' : '') + '><i class="bi bi-arrow-up"></i></button>' +
+                '<button type="button" class="btn btn-outline-secondary py-0 px-1 lk-dn" title="Nach unten"' + (idx === fields.length - 1 ? ' disabled' : '') + '><i class="bi bi-arrow-down"></i></button>' +
+                '</div>' +
+                '<input type="text" name="cf_label" class="form-control form-control-sm" placeholder="Feldname (z. B. Vorname)" value="' + esc(cf.label) + '">' +
+                '<input type="hidden" name="cf_key" value="' + esc(cf.key) + '">' +
+                '<input type="hidden" name="cf_zone" value="body">' +
+                '<input type="hidden" name="cf_show_card" value="' + (showCard ? '1' : '0') + '">' +
+                '<select name="cf_type" class="form-select form-select-sm w-auto">' + optsHtml + '</select>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 lk-del" title="Feld löschen">&times;</button>' +
+                '</div>' +
+                '<div class="d-flex flex-wrap gap-2 align-items-center">' +
+                '<select name="cf_width" class="form-select form-select-sm w-auto" title="Feldbreite im öffentlichen Formular">' +
+                '<option value="full"' + (cf.width !== 'half' ? ' selected' : '') + '>Volle Breite (1/1)</option>' +
+                '<option value="half"' + (cf.width === 'half' ? ' selected' : '') + '>Halbe Breite (1/2)</option>' +
+                '</select>' +
+                '<input type="text" name="cf_section" class="form-control form-control-sm flex-grow-1" style="min-width: 160px;" placeholder="Abschnitts-Überschrift (optional)" value="' + esc(cf.section) + '">' +
+                '<label class="form-check form-switch small m-0 ms-auto text-nowrap" title="Zeigt diesen Wert kompakt in der Eingangslisten-Übersicht (im öffentlichen Formular immer sichtbar)">' +
+                '<input type="checkbox" class="form-check-input lk-show-chk"' + (showCard ? ' checked' : '') + '>' +
+                '<span class="form-check-label">In Eingangsliste</span>' +
+                '</label>' +
+                '</div>' +
+                '<input type="text" name="cf_options" class="form-control form-control-sm' + (needsOpts ? '' : ' d-none') + '" placeholder="Auswahl-Optionen kommagetrennt (z. B. Aktiv (62 €), Förder (31 €))" value="' + esc(cf.options) + '">';
+
+            wrap.querySelector('input[name="cf_label"]').oninput = e => { cf.label = e.target.value; renderPreview(); };
+            wrap.querySelector('select[name="cf_width"]').onchange = e => { cf.width = e.target.value; renderPreview(); };
+            wrap.querySelector('input[name="cf_section"]').oninput = e => { cf.section = e.target.value; renderPreview(); };
+            const optInp = wrap.querySelector('input[name="cf_options"]');
+            optInp.oninput = e => { cf.options = e.target.value; renderPreview(); };
+            wrap.querySelector('select[name="cf_type"]').onchange = e => {
+                cf.type = e.target.value;
+                optInp.classList.toggle('d-none', !['select', 'radio', 'multiselect'].includes(cf.type));
+                renderPreview();
+            };
+            const showHidden = wrap.querySelector('input[name="cf_show_card"]');
+            wrap.querySelector('.lk-show-chk').onchange = e => {
+                cf.show_on_card = e.target.checked;
+                showHidden.value = e.target.checked ? '1' : '0';
+            };
+            wrap.querySelector('.lk-up').onclick = () => {
+                if (idx > 0) { [fields[idx - 1], fields[idx]] = [fields[idx], fields[idx - 1]]; renderEditor(); }
+            };
+            wrap.querySelector('.lk-dn').onclick = () => {
+                if (idx < fields.length - 1) { [fields[idx + 1], fields[idx]] = [fields[idx], fields[idx + 1]]; renderEditor(); }
+            };
+            wrap.querySelector('.lk-del').onclick = () => {
+                fields.splice(idx, 1);
+                renderEditor();
+            };
+            box.appendChild(wrap);
+        });
+        renderPreview();
+    }
+
+    document.getElementById('lk-add-field-btn').onclick = () => {
+        const key = 'feld_' + (fields.length + 1) + '_' + Math.random().toString(36).slice(2, 5);
+        fields.push({ key: key, label: '', type: 'text', options: '', zone: 'body', show_on_card: true, width: 'full', section: '' });
+        renderEditor();
+    };
+    nameInp.addEventListener('input', renderPreview);
+    descInp.addEventListener('input', renderPreview);
+
+    renderEditor();
+})();
+</script>
+{% endblock %}

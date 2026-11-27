@@ -543,23 +543,28 @@ class ListKitTests(TestCase):
         r_get = self.client.get(reverse("list_kit:builder_edit", args=[tpl.id]))
         self.assertContains(r_get, 'name="cf_width"')
         self.assertContains(r_get, 'name="cf_section"')
-        self.assertContains(r_get, "Interne Eingangsliste (Backend-Vorschau)")
+        self.assertContains(r_get, "Live-Vorschau (Öffentliches Formular)")
+        self.assertNotContains(r_get, "Baustein-Palette")
         r_post = self.client.post(reverse("list_kit:builder_edit", args=[tpl.id]), {
+            "form_editor_mode": "1",
             "name": "FormTest",
             "content_type": "form_inbox",
-            "cf_label": ["Name"],
-            "cf_key": ["nachname"],
-            "cf_type": ["text"],
-            "cf_options": [""],
-            "cf_zone": ["body"],
-            "cf_show_card": ["1"],
-            "cf_width": ["half"],
-            "cf_section": ["Persönliche Daten"],
+            "cf_label": ["Name", "IBAN"],
+            "cf_key": ["nachname", "iban"],
+            "cf_type": ["text", "text"],
+            "cf_options": ["", ""],
+            "cf_zone": ["body", "body"],
+            "cf_show_card": ["1", "0"],
+            "cf_width": ["half", "half"],
+            "cf_section": ["Persönliche Daten", ""],
         })
         self.assertEqual(r_post.status_code, 302)
         tpl.refresh_from_db()
         self.assertEqual(tpl.custom_fields_json[0]["width"], "half")
         self.assertEqual(tpl.custom_fields_json[0]["section"], "Persönliche Daten")
+        self.assertTrue(tpl.custom_fields_json[0]["show_on_card"])
+        self.assertFalse(tpl.custom_fields_json[1]["show_on_card"])
+        self.assertEqual(tpl.custom_fields_json[1]["zone"], "body")
 
 
 if __name__ == "__main__":

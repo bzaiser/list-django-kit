@@ -103,7 +103,47 @@
                             <div class="flex-grow-1 min-w-0">
                         {% endwith %}
                         {% endif %}
-                        {% if ui.card_layout %}
+                        {% if template.content_type == 'form_inbox' %}
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <strong class="text-break">{{ entry.title }}</strong>
+                                {% if template.use_status %}
+                                    <span class="badge {% if entry.status == 'Bestätigt' %}text-bg-primary{% elif entry.status == 'Teilgenommen' %}text-bg-success{% elif entry.status == 'Abgesagt' or entry.status == 'Abgelehnt' %}text-bg-danger{% else %}text-bg-warning{% endif %}">{{ entry.status }}</span>
+                                {% endif %}
+                                {% if entry.custom_data_json.is_paid %}
+                                    <span class="badge text-bg-success"><i class="bi bi-check-lg me-1"></i>Bezahlt</span>
+                                {% endif %}
+                                <span class="small text-muted ms-auto">{{ entry.created_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                            {% if custom_display %}
+                            <div class="d-flex flex-wrap gap-x-3 gap-y-1 small text-body-secondary mt-1" style="column-gap: 1rem;">
+                                {% for cf in custom_display %}
+                                    {% if cf.show_on_card %}
+                                    <span><span class="text-muted">{{ cf.label }}:</span> <strong class="text-body">{{ cf.value }}</strong></span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="collapse mt-2" id="lk-inbox-detail-{{ entry.id }}">
+                                <div class="border rounded-3 bg-body-tertiary p-2">
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        <tbody>
+                                            {% for cf in custom_display %}
+                                            <tr>
+                                                <th class="text-muted fw-semibold py-1" style="width: 38%;">{{ cf.label }}</th>
+                                                <td class="py-1 text-break">{{ cf.value }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                            {% if entry.notes %}
+                                            <tr>
+                                                <th class="text-muted fw-semibold py-1">Bemerkungen</th>
+                                                <td class="py-1 text-break">{{ entry.notes|linebreaksbr }}</td>
+                                            </tr>
+                                            {% endif %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% elif ui.card_layout %}
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <strong class="text-break">{{ entry.title }}</strong>
                                 {% if template.use_status %}
@@ -153,7 +193,13 @@
                 </div>
                 <div class="d-flex align-items-center justify-content-between gap-2 border-top pt-2">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        {% if ui.card_layout %}
+                        {% if template.content_type == 'form_inbox' %}
+                            {% if custom_display or entry.notes %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#lk-inbox-detail-{{ entry.id }}" aria-expanded="false">
+                                <i class="bi bi-card-list me-1"></i>Details ({{ custom_display|length }})
+                            </button>
+                            {% endif %}
+                        {% elif ui.card_layout %}
                             {% for fk in ui.card_layout.footer %}
                                 {% include "list_kit/partials/_entry_field.html" with field_key=fk %}
                             {% endfor %}
