@@ -543,6 +543,7 @@ class ListKitTests(TestCase):
         r_get = self.client.get(reverse("list_kit:builder_edit", args=[tpl.id]))
         self.assertContains(r_get, 'name="cf_width"')
         self.assertContains(r_get, 'name="cf_section"')
+        self.assertContains(r_get, "Interne Eingangsliste (Backend-Vorschau)")
         r_post = self.client.post(reverse("list_kit:builder_edit", args=[tpl.id]), {
             "name": "FormTest",
             "content_type": "form_inbox",

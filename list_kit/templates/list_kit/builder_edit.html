@@ -27,9 +27,19 @@
     <div class="row g-3">
         <!-- Spalte 1: Feld-Palette -->
         <div class="col-12 col-lg-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-header"><i class="bi bi-boxes me-1"></i> {% trans "Baustein-Palette" %}</div>
-                <div class="card-body p-3 d-flex flex-column gap-2" id="lk-palette"></div>
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                    <span><i class="bi bi-boxes me-1"></i> {% trans "Baustein-Palette" %}</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#lk-palette-wrap" aria-expanded="{% if tpl and tpl.content_type == 'form_inbox' or initial_content_type == 'form_inbox' %}false{% else %}true{% endif %}">
+                        <i class="bi bi-chevron-expand"></i>
+                    </button>
+                </div>
+                <div id="lk-palette-wrap" class="collapse {% if tpl and tpl.content_type == 'form_inbox' or initial_content_type == 'form_inbox' %}{% else %}show{% endif %}">
+                    {% if tpl and tpl.content_type == 'form_inbox' or initial_content_type == 'form_inbox' %}
+                    <div class="px-3 pt-2 small text-muted">Nur für interne Eingangsliste (nicht im öffentlichen Formular).</div>
+                    {% endif %}
+                    <div class="card-body p-3 d-flex flex-column gap-2" id="lk-palette"></div>
+                </div>
             </div>
         </div>
 
@@ -37,7 +47,7 @@
         <div class="col-12 col-lg-5">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><i class="bi bi-eye me-1"></i> {% trans "Interaktive Live-Vorschau" %}</span>
+                    <span id="lk-preview-heading"><i class="bi bi-eye me-1"></i> {% if tpl and tpl.content_type == 'form_inbox' or initial_content_type == 'form_inbox' %}{% trans "Interne Eingangsliste (Backend-Vorschau)" %}{% else %}{% trans "Interaktive Live-Vorschau" %}{% endif %}</span>
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-outline-secondary lk-mode-btn" data-mode="row"><i class="bi bi-list-ul"></i></button>
                         <button type="button" class="btn btn-outline-secondary lk-mode-btn" data-mode="cards"><i class="bi bi-grid-3x3-gap"></i></button>
@@ -45,6 +55,11 @@
                     </div>
                 </div>
                 <div class="card-body p-3 d-flex flex-column gap-3">
+                    {% if tpl and tpl.content_type == 'form_inbox' or initial_content_type == 'form_inbox' %}
+                    <div class="small text-muted bg-body-tertiary border rounded-2 px-2 py-1">
+                        <i class="bi bi-info-circle me-1 text-primary"></i>Öffentliche Formularfelder werden rechts unter <strong>Eigene Zusatzfelder</strong> bearbeitet. Hier legst du nur fest, wie eingegangene Anträge intern in der Liste aussehen.
+                    </div>
+                    {% endif %}
                     <div class="border rounded-3 p-3" id="lk-preview-card">
                         <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
                             <div class="d-flex align-items-center gap-2 min-w-0">
