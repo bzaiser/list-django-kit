@@ -418,7 +418,7 @@ def entry_save_view(request, pk, entry_id=None):
         ftype = cf.get("type", "text")
         form_key = f"custom_{key}"
         if ftype == "checkbox":
-            custom_data[key] = request.POST.get(form_key) == "on"
+            custom_data[key] = (request.POST.get(form_key) or "").strip().lower() in ("on", "true", "1", "ja", "yes")
         elif ftype == "multiselect":
             custom_data[key] = [v.strip() for v in request.POST.getlist(form_key) if v.strip()]
         elif ftype == "wysiwyg":
@@ -665,7 +665,7 @@ def public_submit_view(request, pk):
         ftype = cf.get("type", "text")
         form_key = f"custom_{key}"
         if ftype == "checkbox":
-            custom_data[key] = request.POST.get(form_key) == "on"
+            custom_data[key] = (request.POST.get(form_key) or "").strip().lower() in ("on", "true", "1", "ja", "yes")
         elif ftype == "multiselect":
             custom_data[key] = [v.strip() for v in request.POST.getlist(form_key) if v.strip()]
         elif ftype == "wysiwyg":

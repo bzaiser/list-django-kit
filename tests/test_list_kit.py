@@ -440,6 +440,40 @@ class ListKitTests(TestCase):
         col2 = Collection.objects.get(template=tpl2)
         self.assertTrue(col2.allow_public_submit)
 
+    def test_public_submit_handles_ja_checkbox_and_radio_values(self):
+        tpl = ListTemplate.objects.create(
+            name="Mitgliedsantrag Submit",
+            slug="mitgliedsantrag-submit-tpl",
+            content_type="form_inbox",
+            custom_fields_json=[
+                {"key": "mitgliedsart", "label": "Mitgliedschaft", "type": "radio", "options": "Aktives Mitglied (62 Euro), Fördermitglied (31 Euro)", "zone": "body", "show_on_card": True},
+                {"key": "einzugsermaechtigung", "label": "SEPA", "type": "checkbox", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "satzung_akzeptiert", "label": "Satzung", "type": "checkbox", "options": "", "zone": "body", "show_on_card": False},
+                {"key": "portal_zugang", "label": "Portal", "type": "select", "options": "Ja, Nein", "zone": "body", "show_on_card": True},
+            ],
+        )
+        col = Collection.objects.create(
+            title="Mitgliedsantrag",
+            slug="mitgliedsantrag-submit",
+            template=tpl,
+            owner=self.staff,
+            is_public=True,
+            allow_public_submit=True,
+        )
+        r = self.client.post(reverse("list_kit:public_submit", args=[col.id]), {
+            "title": "Antrag Test",
+            "custom_mitgliedsart": "Aktives Mitglied (62 Euro)",
+            "custom_einzugsermaechtigung": "Ja",
+            "custom_satzung_akzeptiert": "Ja",
+            "custom_portal_zugang": "Ja",
+        })
+        self.assertEqual(r.status_code, 302)
+        entry = Entry.objects.get(collection=col, title="Antrag Test")
+        self.assertEqual(entry.custom_data_json["mitgliedsart"], "Aktives Mitglied (62 Euro)")
+        self.assertTrue(entry.custom_data_json["einzugsermaechtigung"])
+        self.assertTrue(entry.custom_data_json["satzung_akzeptiert"])
+        self.assertEqual(entry.custom_data_json["portal_zugang"], "Ja")
+
 
 if __name__ == "__main__":
     import unittest
