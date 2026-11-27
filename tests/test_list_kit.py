@@ -391,7 +391,13 @@ class ListKitTests(TestCase):
         e1 = Entry.objects.create(
             collection=col,
             title="Ohne Login",
-            custom_data_json={"vorname": "Erika", "nachname": "Ohne", "portal_zugang": "Nein"},
+            custom_data_json={
+                "vorname": "Erika",
+                "nachname": "Ohne",
+                "portal_zugang": "Nein",
+                "einzugsermaechtigung": True,
+                "satzung_akzeptiert": True,
+            },
             created_by=self.user,
         )
         r1 = self.client.post(reverse("list_kit:entry_create_person", args=[col.id, e1.id]))

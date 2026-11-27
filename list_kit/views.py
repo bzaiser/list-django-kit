@@ -855,7 +855,11 @@ def entry_create_person_view(request, pk, entry_id):
         ("familienmitglieder", "Familienmitglieder"),
         ("satzung_akzeptiert", "Satzung & Hausordnung"),
     ):
-        val = (data.get(key) or "").strip()
+        raw_val = data.get(key)
+        if isinstance(raw_val, bool):
+            val = "Ja" if raw_val else ""
+        else:
+            val = (str(raw_val) if raw_val is not None else "").strip()
         if val:
             note_lines.append(f"{lbl}: {val}")
     if (entry.notes or "").strip():
