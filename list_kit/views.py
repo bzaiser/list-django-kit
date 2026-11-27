@@ -34,7 +34,8 @@ def _user_can_access_collection(user, collection: Collection, write: bool = Fals
             return True
         if collection.shared_with.filter(pk=user.pk).exists():
             return True
-        if collection.is_public and user.groups.filter(name__in=("Redakteur", "Leitung / Vorstand", "Vorstand")).exists():
+        from design_studio.permissions import get_role_group_names
+        if collection.is_public and user.groups.filter(name__in=get_role_group_names("editorial")).exists():
             return True
     if not write and collection.is_public:
         return True
@@ -45,22 +46,15 @@ def _user_allowed_collections(user):
     if user.is_superuser:
         return Collection.objects.all()
     q = Q(owner=user) | Q(responsible_user=user) | Q(shared_with=user)
-    if user.groups.filter(name__in=("Redakteur", "Leitung / Vorstand", "Vorstand")).exists():
+    from design_studio.permissions import get_role_group_names
+    if user.groups.filter(name__in=get_role_group_names("editorial")).exists():
         q |= Q(is_public=True)
     return Collection.objects.filter(q).distinct()
 
 
 def _can_manage_collections(user) -> bool:
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if user.is_superuser or user.is_staff:
-        return True
-    from django.contrib.auth.models import Group
-    if not Group.objects.exists():
-        return True
-    return user.groups.filter(
-        name__in=("Leitung / Vorstand", "Vorstand", "Schriftführer", "Redakteur", "Pressewart", "Mitarbeiter")
-    ).exists()
+    from design_studio.permissions import user_has_role
+    return user_has_role(user, "list_manage", allow_when_no_groups=True)
 
 
 def _unique_collection_slug(base_slug: str) -> str:
@@ -93,10 +87,15 @@ def collection_list_view(request):
 
     form_cards = []
     seen_tpl_ids = set()
+    npo_only_slugs = {"mitgliedsantrag", "kuendigung", "kurs-anmeldung"}
+    from design_studio.permissions import is_npo_profile
+    show_npo_templates = is_npo_profile()
     if request.user.is_authenticated and (request.user.is_staff or can_manage):
         for tpl in ListTemplate.objects.filter(content_type="form_inbox").order_by("name"):
-            seen_tpl_ids.add(tpl.id)
             inboxes = inbox_by_tpl.get(tpl.id, [])
+            if not inboxes and tpl.slug in npo_only_slugs and not show_npo_templates:
+                continue
+            seen_tpl_ids.add(tpl.id)
             if inboxes:
                 for col in inboxes:
                     form_cards.append({"template": tpl, "collection": col})
@@ -245,10 +244,19 @@ def collection_detail_view(request, pk):
             else None
         )
 
+    cf_keys = {str(cf.get("key") or "").lower() for cf in prepared_custom_fields}
+    can_create_person_from_entry = (
+        col.template.content_type == "form_inbox"
+        and (
+            col.template.slug == "mitgliedsantrag"
+            or bool(cf_keys & {"vorname", "nachname", "absender_name", "name"})
+        )
+    )
     ctx = {
         "collection": col,
         "template": col.template,
         "can_edit": can_edit,
+        "can_create_person_from_entry": can_create_person_from_entry,
         "active_entries": active_entries,
         "completed_entries": completed_entries,
         "status_filter": status_filter,
@@ -861,8 +869,10 @@ def entry_create_person_view(request, pk, entry_id):
         birth_date=birth_date,
         notes="\n".join(note_lines),
     )
-    member_role, _ = Role.objects.get_or_create(name="Mitglied")
-    person.roles.add(member_role)
+    from design_studio.permissions import is_npo_profile
+    if is_npo_profile() or col.template.slug == "mitgliedsantrag":
+        member_role, _ = Role.objects.get_or_create(name="Mitglied")
+        person.roles.add(member_role)
     street = (data.get("strasse") or "").strip()[:140]
     plz_ort = (data.get("plz_ort") or "").strip()
     if street or plz_ort:
@@ -1302,7 +1312,7 @@ def entry_press_pdf_view(request, pk, entry_id):
     if not can_write and (entry.visibility != "public" or not entry.is_currently_published()):
         return HttpResponseForbidden()
     from django.conf import settings as django_settings
-    org_name = getattr(django_settings, "DESIGN_STUDIO_APP_NAME", "Kunstverein")
+    org_name = getattr(django_settings, "DESIGN_STUDIO_APP_NAME", "Organisation")
     contact_email = ""
     from django.apps import apps
     if apps.is_installed("site_kit"):
