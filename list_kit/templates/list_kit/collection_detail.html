@@ -24,6 +24,16 @@
         <a href="{% url 'list_kit:collection_export_csv' collection.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
             <i class="bi bi-filetype-csv me-1"></i>{% trans "CSV-Export" %}
         </a>
+        {% if collection.allow_public_submit %}
+        <a href="/formular/{{ collection.slug }}/" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="bi bi-box-arrow-up-right me-1"></i>{% trans "Öffentliches Formular" %}
+        </a>
+        {% endif %}
+        {% endif %}
+        {% if request.user.is_staff %}
+        <a href="{% url 'list_kit:builder_edit' template.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+            <i class="bi bi-sliders me-1"></i>{% trans "Felder / Vorlage bearbeiten" %}
+        </a>
         {% endif %}
         {% if can_edit %}
         <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#newEntryModal">

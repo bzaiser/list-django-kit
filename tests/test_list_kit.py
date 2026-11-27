@@ -391,6 +391,18 @@ class ListKitTests(TestCase):
         r1 = self.client.post(reverse("list_kit:entry_create_person", args=[col.id, e1.id]))
         self.assertEqual(r1.status_code, 302)
 
+        col_staff = Collection.objects.create(
+            title="Anträge Web",
+            slug="mitgliedsantrag-test",
+            template=tpl_map["mitgliedsantrag"],
+            owner=self.staff,
+            allow_public_submit=True,
+        )
+        self.client.force_login(self.staff)
+        r_det = self.client.get(reverse("list_kit:collection_detail", args=[col_staff.id]))
+        self.assertContains(r_det, reverse("list_kit:builder_edit", args=[tpl_map["mitgliedsantrag"].id]))
+        self.assertContains(r_det, f"/formular/{col_staff.slug}/")
+
 
 if __name__ == "__main__":
     import unittest
