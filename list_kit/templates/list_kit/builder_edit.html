@@ -519,10 +519,10 @@
             return '<span class="badge bg-body-secondary text-body border"><i class="bi bi-person-badge me-1"></i>' + (idx % 2 === 0 ? 'Anna Weber' : 'Max Richter') + '</span>';
         }
         if (fid === 'use_document') {
-            return '<span class="btn btn-outline-secondary btn-sm py-0 px-2 disabled"><i class="bi bi-file-earmark-arrow-down me-1"></i>Programm.pdf</span>';
+            return '<span class="btn btn-outline-secondary btn-sm py-0 px-2" style="pointer-events: none;"><i class="bi bi-file-earmark-arrow-down me-1"></i>Programm.pdf</span>';
         }
         if (fid === 'use_url') {
-            return '<span class="btn btn-outline-primary btn-sm py-0 px-2 disabled"><i class="bi bi-arrow-right me-1"></i>Mehr erfahren</span>';
+            return '<span class="btn btn-outline-primary btn-sm py-0 px-2" style="pointer-events: none;"><i class="bi bi-arrow-right me-1"></i>Mehr erfahren</span>';
         }
         if (fid === 'use_price') {
             return '<span class="badge bg-body-secondary text-body border">' + (idx % 2 === 0 ? '24,00 €' : '15,00 €') + '</span>';
@@ -552,7 +552,7 @@
                 else if (cf.type === 'date') val = '05.12.2026';
                 else if (cf.type === 'rating') val = '5/5';
                 else if (cf.type === 'page_link' || cf.type === 'url') {
-                    return '<span class="btn btn-outline-primary btn-sm py-0 px-2 disabled"><i class="bi bi-link-45deg me-1"></i>' + lbl + '</span>';
+                    return '<span class="btn btn-outline-primary btn-sm py-0 px-2" style="pointer-events: none;"><i class="bi bi-link-45deg me-1"></i>' + lbl + '</span>';
                 }
             }
             return '<span class="badge bg-body-secondary text-body border">' + lbl + ': <strong>' + escHtml(val) + '</strong></span>';
