@@ -772,10 +772,12 @@ def entry_create_person_view(request, pk, entry_id):
         return HttpResponseForbidden()
     entry = get_object_or_404(Entry, pk=entry_id, collection=col)
     try:
-        from domain_kit.models import Address, Person
+        from domain_kit.models import Address, Person, Role
     except Exception:
         messages.error(request, "domain_kit ist nicht installiert.")
         return redirect("list_kit:collection_detail", pk=col.id)
+
+    from datetime import date as _date
 
     data = dict(entry.custom_data_json or {})
     first = (data.get("vorname") or "").strip()
@@ -787,14 +789,44 @@ def entry_create_person_view(request, pk, entry_id):
     first = (first or entry.title or "Neu")[:80]
     email = (data.get("absender_email") or data.get("email") or "").strip()[:140]
     phone = (data.get("telefon") or "").strip()[:60]
+    mobile = (data.get("mobiltelefon") or data.get("mobile") or "").strip()[:60]
+
+    birth_date = None
+    raw_bday = (data.get("geburtstag") or "").strip()
+    if raw_bday:
+        try:
+            birth_date = _date.fromisoformat(raw_bday[:10])
+        except ValueError:
+            birth_date = None
+
+    note_lines = [f"Übernommen aus {col.title}: {entry.title}"]
+    for key, lbl in (
+        ("mitgliedsart", "Mitgliedschaft"),
+        ("beitrag_eur", "Jahresbeitrag (EUR)"),
+        ("einzugsermaechtigung", "Einzugsermächtigung"),
+        ("iban", "IBAN / Konto"),
+        ("bank_bic", "Bank / BLZ / BIC"),
+        ("familienmitglieder", "Familienmitglieder"),
+        ("satzung_akzeptiert", "Satzung & Hausordnung"),
+    ):
+        val = (data.get(key) or "").strip()
+        if val:
+            note_lines.append(f"{lbl}: {val}")
+    if (entry.notes or "").strip():
+        note_lines.append(f"Bemerkungen: {entry.notes.strip()}")
+
     person = Person.objects.create(
         first_name=first,
         last_name=last[:80],
         display_name=f"{first} {last}".strip()[:140],
         email=email,
         phone=phone,
-        notes=f"Übernommen aus {col.title}: {entry.title}",
+        mobile=mobile,
+        birth_date=birth_date,
+        notes="\n".join(note_lines),
     )
+    member_role, _ = Role.objects.get_or_create(name="Mitglied")
+    person.roles.add(member_role)
     street = (data.get("strasse") or "").strip()[:140]
     plz_ort = (data.get("plz_ort") or "").strip()
     if street or plz_ort:
