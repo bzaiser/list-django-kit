@@ -519,6 +519,18 @@ class ListKitTests(TestCase):
         self.assertEqual(r_tpl.status_code, 302)
         self.assertFalse(ListTemplate.objects.filter(id=tpl.id).exists())
 
+    def test_collection_create_from_form_inbox_enables_public_submit(self):
+        self.client.force_login(self.staff)
+        tpl = ListTemplate.objects.create(name="Umfrage", slug="umfrage-tpl", content_type="form_inbox")
+        r = self.client.post(reverse("list_kit:collection_create"), {
+            "template_id": tpl.id,
+            "title": "Mitglieder-Umfrage",
+        })
+        self.assertEqual(r.status_code, 302)
+        col = Collection.objects.get(title="Mitglieder-Umfrage")
+        self.assertTrue(col.is_public)
+        self.assertTrue(col.allow_public_submit)
+
 
 if __name__ == "__main__":
     import unittest

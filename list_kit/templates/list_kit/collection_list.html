@@ -23,7 +23,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
         <div>
             <h2 class="h5 fw-bold mb-0"><i class="bi bi-envelope-paper me-2 text-primary"></i>{% trans "Formulare & Eingangslisten" %}</h2>
-            <div class="small text-muted">{% trans "Öffentliche Formulare definieren und verknüpfte Eingänge bearbeiten" %}</div>
+            <div class="small text-muted">{% trans "Formular und Eingangsliste sind eine Einheit: „Eingänge“ zeigt die Anträge; über /formular/…/ oder den Seitenblock „Öffentliches Formular“ füllen Besucher es aus." %}</div>
         </div>
         {% if request.user.is_staff %}
         <a href="{% url 'list_kit:builder_create' %}?type=form_inbox" class="btn btn-primary btn-sm rounded-pill px-3">

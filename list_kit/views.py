@@ -128,11 +128,13 @@ def collection_create_view(request):
             messages.error(request, "Bitte Vorlage und Titel angeben.")
             return redirect("list_kit:collection_create")
         tpl = get_object_or_404(ListTemplate, pk=tpl_id)
+        is_inbox = tpl.content_type == "form_inbox"
         col = Collection.objects.create(
             title=title[:200],
             template=tpl,
             owner=request.user,
-            is_public=request.POST.get("is_public") == "on",
+            is_public=True if is_inbox else (request.POST.get("is_public") == "on"),
+            allow_public_submit=is_inbox,
         )
         messages.success(request, f"Sammlung „{col.title}“ erstellt.")
         return redirect("list_kit:collection_detail", pk=col.id)
@@ -971,7 +973,7 @@ def collection_export_csv_view(request, pk):
 @staff_member_required
 def builder_list_view(request):
     seed_default_templates()
-    templates = ListTemplate.objects.annotate(collection_count=Count("collections")).order_by("name")
+    templates = ListTemplate.objects.annotate(collection_count=Count("collections")).prefetch_related("collections").order_by("name")
     return render(request, "list_kit/builder_list.html", {"templates": templates})
 
 
