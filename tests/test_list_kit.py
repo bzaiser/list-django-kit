@@ -531,6 +531,29 @@ class ListKitTests(TestCase):
         self.assertTrue(col.is_public)
         self.assertTrue(col.allow_public_submit)
 
+    def test_builder_edit_exposes_and_saves_width_and_section(self):
+        self.client.force_login(self.staff)
+        tpl = ListTemplate.objects.create(name="FormTest", slug="form-width-sec", content_type="form_inbox")
+        r_get = self.client.get(reverse("list_kit:builder_edit", args=[tpl.id]))
+        self.assertContains(r_get, 'name="cf_width"')
+        self.assertContains(r_get, 'name="cf_section"')
+        r_post = self.client.post(reverse("list_kit:builder_edit", args=[tpl.id]), {
+            "name": "FormTest",
+            "content_type": "form_inbox",
+            "cf_label": ["Name"],
+            "cf_key": ["nachname"],
+            "cf_type": ["text"],
+            "cf_options": [""],
+            "cf_zone": ["body"],
+            "cf_show_card": ["1"],
+            "cf_width": ["half"],
+            "cf_section": ["Persönliche Daten"],
+        })
+        self.assertEqual(r_post.status_code, 302)
+        tpl.refresh_from_db()
+        self.assertEqual(tpl.custom_fields_json[0]["width"], "half")
+        self.assertEqual(tpl.custom_fields_json[0]["section"], "Persönliche Daten")
+
 
 if __name__ == "__main__":
     import unittest
