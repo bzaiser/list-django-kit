@@ -1,6 +1,9 @@
+import atexit
 import json
 import os
+import shutil
 import sys
+import tempfile
 
 import django
 from django.conf import settings
@@ -14,8 +17,11 @@ for p in (BASE_DIR, DS_DIR):
         sys.path.insert(0, p)
 
 if not settings.configured:
+    _TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="list_kit_test_media_")
+    atexit.register(shutil.rmtree, _TEST_MEDIA_ROOT, ignore_errors=True)
     settings.configure(
         DEBUG=True,
+        MEDIA_ROOT=_TEST_MEDIA_ROOT,
         SECRET_KEY="test-list-kit",
         DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
         INSTALLED_APPS=[
