@@ -403,6 +403,37 @@ class ListKitTests(TestCase):
         self.assertContains(r_det, reverse("list_kit:builder_edit", args=[tpl_map["mitgliedsantrag"].id]))
         self.assertContains(r_det, f"/formular/{col_staff.slug}/")
 
+    def test_generic_forms_and_inbox_lists_workflow(self):
+        self.client.force_login(self.staff)
+        # 1. Create a brand-new generic form template WITH automatic inbox creation
+        r_new = self.client.post(reverse("list_kit:builder_create"), {
+            "name": "Feedback-Formular",
+            "content_type": "form_inbox",
+            "create_inbox": "1",
+            "cf_label": ["Bewertung", "Kommentar"],
+            "cf_type": ["text", "textarea"],
+            "cf_zone": ["body", "body"],
+            "cf_show_card": ["1", "1"],
+        })
+        self.assertEqual(r_new.status_code, 302)
+        tpl = ListTemplate.objects.get(name="Feedback-Formular")
+        col = Collection.objects.get(template=tpl)
+        self.assertTrue(col.is_public)
+        self.assertTrue(col.allow_public_submit)
+
+        # 2. Create another form template WITHOUT inbox, then create inbox via 1-click button
+        tpl2 = ListTemplate.objects.create(name="Schadensmeldung", content_type="form_inbox")
+        r_list = self.client.get(reverse("list_kit:collection_list"))
+        self.assertContains(r_list, "Formulare & Eingangslisten")
+        self.assertContains(r_list, "Listen, News, Galerien & FAQs")
+        self.assertContains(r_list, "Eingangsliste jetzt erstellen")
+        self.assertContains(r_list, f"/formular/{col.slug}/")
+
+        r_ci = self.client.post(reverse("list_kit:builder_create_inbox", args=[tpl2.id]))
+        self.assertEqual(r_ci.status_code, 302)
+        col2 = Collection.objects.get(template=tpl2)
+        self.assertTrue(col2.allow_public_submit)
+
 
 if __name__ == "__main__":
     import unittest

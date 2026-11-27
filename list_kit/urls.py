@@ -11,6 +11,7 @@ urlpatterns = [
     path("builder/new/", views.builder_edit_view, name="builder_create"),
     path("builder/import/", views.builder_import_view, name="builder_import"),
     path("builder/<int:pk>/", views.builder_edit_view, name="builder_edit"),
+    path("builder/<int:pk>/create-inbox/", views.builder_create_inbox_view, name="builder_create_inbox"),
     path("builder/<int:pk>/export/", views.builder_export_view, name="builder_export"),
     path("builder/<int:pk>/delete/", views.builder_delete_view, name="builder_delete"),
     path("<uuid:pk>/", views.collection_detail_view, name="collection_detail"),

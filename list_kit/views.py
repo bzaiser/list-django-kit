@@ -63,10 +63,20 @@ def _can_manage_collections(user) -> bool:
     ).exists()
 
 
+def _unique_collection_slug(base_slug: str) -> str:
+    base = slugify(base_slug or "formular")[:100] or "formular"
+    cand = base
+    idx = 2
+    while Collection.objects.filter(slug=cand).exists():
+        cand = f"{base[:90]}-{idx}"
+        idx += 1
+    return cand
+
+
 @login_required
 def collection_list_view(request):
     seed_default_templates()
-    qs = (
+    qs = list(
         _user_allowed_collections(request.user)
         .select_related("template", "owner")
         .annotate(
@@ -74,9 +84,35 @@ def collection_list_view(request):
             done_count=Count("entries", filter=Q(entries__is_completed=True)),
         )
     )
+    can_manage = _can_manage_collections(request.user)
+    regular_collections = [c for c in qs if c.template.content_type != "form_inbox"]
+    inbox_by_tpl: dict[int, list] = {}
+    for c in qs:
+        if c.template.content_type == "form_inbox":
+            inbox_by_tpl.setdefault(c.template_id, []).append(c)
+
+    form_cards = []
+    seen_tpl_ids = set()
+    if request.user.is_authenticated and (request.user.is_staff or can_manage):
+        for tpl in ListTemplate.objects.filter(content_type="form_inbox").order_by("name"):
+            seen_tpl_ids.add(tpl.id)
+            inboxes = inbox_by_tpl.get(tpl.id, [])
+            if inboxes:
+                for col in inboxes:
+                    form_cards.append({"template": tpl, "collection": col})
+            else:
+                form_cards.append({"template": tpl, "collection": None})
+    for tpl_id, inboxes in inbox_by_tpl.items():
+        if tpl_id in seen_tpl_ids:
+            continue
+        for col in inboxes:
+            form_cards.append({"template": col.template, "collection": col})
+
     return render(request, "list_kit/collection_list.html", {
         "collections": qs,
-        "can_create_collection": _can_manage_collections(request.user),
+        "regular_collections": regular_collections,
+        "form_cards": form_cards,
+        "can_create_collection": can_manage,
     })
 
 
@@ -1071,8 +1107,25 @@ def builder_edit_view(request, pk=None):
             "pdf": pdf_cfg,
         }
         tpl.save()
+        if tpl.content_type == "form_inbox" and request.POST.get("create_inbox") == "1":
+            if not Collection.objects.filter(template=tpl).exists():
+                col = Collection.objects.create(
+                    title=tpl.name[:200],
+                    slug=_unique_collection_slug(tpl.slug or tpl.name),
+                    template=tpl,
+                    owner=request.user,
+                    is_public=True,
+                    allow_public_submit=True,
+                )
+                messages.success(request, f"Formular „{tpl.name}“ und Eingangsliste (/formular/{col.slug}/) erstellt.")
+                return redirect("list_kit:collection_detail", pk=col.id)
         messages.success(request, f"Vorlage „{tpl.name}“ gespeichert.")
         return redirect("list_kit:builder_list")
+
+    initial_content_type = (request.GET.get("type") or "").strip() if tpl is None else tpl.content_type
+    if initial_content_type not in dict(ListTemplate.CONTENT_TYPE_CHOICES):
+        initial_content_type = "list"
+    has_inbox_collection = Collection.objects.filter(template=tpl).exists() if tpl else False
 
     active_keys = [f["key"] for f in FIELD_DEFS if (getattr(tpl, f["key"], False) if tpl else f["key"] in ("use_notes", "use_status"))]
     ui_style = tpl.get_ui_style() if tpl else {
@@ -1090,6 +1143,8 @@ def builder_edit_view(request, pk=None):
     custom_fields = tpl.custom_fields_json if (tpl and isinstance(tpl.custom_fields_json, list)) else []
     return render(request, "list_kit/builder_edit.html", {
         "tpl": tpl,
+        "initial_content_type": initial_content_type,
+        "has_inbox_collection": has_inbox_collection,
         "field_defs_json": json.dumps(FIELD_DEFS),
         "active_keys_json": json.dumps(active_keys),
         "custom_fields_json": json.dumps(custom_fields),
@@ -1098,6 +1153,24 @@ def builder_edit_view(request, pk=None):
         "ui_style_json": json.dumps(ui_style),
         "content_type_choices": ListTemplate.CONTENT_TYPE_CHOICES,
     })
+
+
+@login_required
+@require_POST
+def builder_create_inbox_view(request, pk):
+    if not _can_manage_collections(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Erstellen neuer Eingangslisten.")
+    tpl = get_object_or_404(ListTemplate, pk=pk)
+    col = Collection.objects.create(
+        title=tpl.name[:200],
+        slug=_unique_collection_slug(tpl.slug or tpl.name),
+        template=tpl,
+        owner=request.user,
+        is_public=True,
+        allow_public_submit=True,
+    )
+    messages.success(request, f"Eingangsliste „{col.title}“ erstellt (Formular-URL: /formular/{col.slug}/).")
+    return redirect("list_kit:collection_detail", pk=col.id)
 
 
 @staff_member_required
