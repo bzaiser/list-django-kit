@@ -15,6 +15,7 @@ urlpatterns = [
     path("builder/<int:pk>/export/", views.builder_export_view, name="builder_export"),
     path("builder/<int:pk>/delete/", views.builder_delete_view, name="builder_delete"),
     path("<uuid:pk>/", views.collection_detail_view, name="collection_detail"),
+    path("<uuid:pk>/reorder/", views.entry_reorder_view, name="entry_reorder"),
     path("<uuid:pk>/pdf/", views.collection_pdf_view, name="collection_pdf"),
     path("<uuid:pk>/export.csv", views.collection_export_csv_view, name="collection_export_csv"),
     path("submit/<uuid:pk>/", views.public_submit_view, name="public_submit"),

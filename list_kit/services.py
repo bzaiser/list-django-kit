@@ -26,6 +26,7 @@ FIELD_DEFS = [
     {"key": "use_master_status", "label": "Status (Stammdaten)", "icon": "bi-bookmark-check", "desc": "Zentraler Status aus domain_kit", "default_zone": "header"},
     {"key": "use_person", "label": "Person / Kontakt", "icon": "bi-person-badge", "desc": "Verknüpfung zu Person aus domain_kit", "default_zone": "body"},
     {"key": "use_document", "label": "Dokumente / Downloads", "icon": "bi-file-earmark-arrow-down", "desc": "Datei-Upload oder öffentliches Dokument zum Download", "default_zone": "footer"},
+    {"key": "use_position", "label": "Position (Drag & Drop)", "icon": "bi-grip-vertical", "desc": "Einträge per Ziehen und Ablegen frei sortieren", "default_zone": "hidden"},
 ]
 
 

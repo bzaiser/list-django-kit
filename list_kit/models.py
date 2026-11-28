@@ -37,6 +37,7 @@ class ListTemplate(models.Model):
     use_master_status = models.BooleanField(default=False)
     use_person = models.BooleanField(default=False)
     use_document = models.BooleanField(default=False)
+    use_position = models.BooleanField(default=False)
 
     custom_fields_json = models.JSONField(default=list, blank=True)
     allowed_statuses_json = models.JSONField(default=list, blank=True)

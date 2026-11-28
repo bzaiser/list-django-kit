@@ -162,7 +162,21 @@ def collection_detail_view(request, pk):
         return HttpResponseForbidden("Kein Zugriff auf diese Sammlung.")
 
     can_edit = _user_can_access_collection(request.user, col, write=True)
-    entries_qs = col.entries.select_related("created_by").prefetch_related("images", "documents").all()
+    sort_by = (request.GET.get("sort") or "position").strip().lower()
+    sort_map = {
+        "position": ("-is_pinned", "position", "-created_at"),
+        "title": ("-is_pinned", "title", "-created_at"),
+        "created_desc": ("-is_pinned", "-created_at"),
+        "created_asc": ("-is_pinned", "created_at"),
+        "status": ("-is_pinned", "status", "position", "-created_at"),
+    }
+    if sort_by not in sort_map:
+        sort_by = "position"
+    entries_qs = (
+        col.entries.select_related("created_by")
+        .prefetch_related("images", "documents")
+        .order_by(*sort_map[sort_by])
+    )
     if not can_edit:
         entries_qs = entries_qs.filter(visibility="public")
 
@@ -273,6 +287,7 @@ def collection_detail_view(request, pk):
         "can_create_person_from_entry": can_create_person_from_entry,
         "active_entries": active_entries,
         "completed_entries": completed_entries,
+        "sort_by": sort_by,
         "status_filter": status_filter,
         "inbox_tabs": inbox_tabs,
         "news_view_mode": locals().get("news_view_mode", "active"),
@@ -295,6 +310,25 @@ def collection_detail_view(request, pk):
         except Exception:
             pass
     return render(request, "list_kit/collection_detail.html", ctx)
+
+
+@login_required
+@require_POST
+def entry_reorder_view(request, pk):
+    col = get_object_or_404(Collection, pk=pk)
+    if not _user_can_access_collection(request.user, col, write=True):
+        return JsonResponse({"ok": False, "error": "Kein Zugriff."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        ids = payload.get("ids") or []
+    except Exception:
+        ids = request.POST.getlist("ids[]") or request.POST.getlist("ids")
+    pos = 10
+    for raw_id in ids:
+        if str(raw_id).isdigit():
+            Entry.objects.filter(collection=col, pk=int(raw_id)).update(position=pos)
+            pos += 10
+    return JsonResponse({"ok": True})
 
 
 @login_required

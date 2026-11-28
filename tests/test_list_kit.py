@@ -599,6 +599,33 @@ class ListKitTests(TestCase):
         self.assertContains(r_vlist, "Mitgliedsantrag")
         self.assertEqual(self.client.get(f"/lists/{col_inbox.id}/").status_code, 200)
 
+    def test_use_position_drag_reorder_and_collection_sort_options(self):
+        import json as _json
+        self.client.force_login(self.staff)
+        tpl = ListTemplate.objects.create(name="SortTest", slug="sort-test", content_type="list", use_position=True)
+        col = Collection.objects.create(title="SortCol", slug="sort-col", template=tpl, owner=self.staff)
+        e_b = Entry.objects.create(collection=col, title="Bravo", status="open", position=10)
+        e_a = Entry.objects.create(collection=col, title="Alpha", status="done", position=20)
+
+        # Drag & drop reorder via JSON
+        r_re = self.client.post(
+            f"/lists/{col.id}/reorder/",
+            data=_json.dumps({"ids": [e_a.id, e_b.id]}),
+            content_type="application/json",
+        )
+        self.assertEqual(r_re.status_code, 200)
+        e_a.refresh_from_db()
+        e_b.refresh_from_db()
+        self.assertLess(e_a.position, e_b.position)
+
+        # Detail view exposes sort dropdown + drag handle and respects ?sort=title
+        r_det = self.client.get(f"/lists/{col.id}/?sort=title")
+        self.assertEqual(r_det.status_code, 200)
+        self.assertContains(r_det, "lk-sort-select")
+        self.assertContains(r_det, "lk-entry-drag")
+        html = r_det.content.decode()
+        self.assertLess(html.index("Alpha"), html.index("Bravo"))
+
 
 if __name__ == "__main__":
     import unittest
