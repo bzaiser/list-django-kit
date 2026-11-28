@@ -29,15 +29,20 @@ from .services import (
 
 
 def _user_can_access_collection(user, collection: Collection, write: bool = False) -> bool:
+    is_inbox = getattr(getattr(collection, "template", None), "content_type", "") == "form_inbox"
     if user and user.is_authenticated:
         if user.is_superuser or collection.owner_id == user.id or collection.responsible_user_id == user.id:
             return True
         if collection.shared_with.filter(pk=user.pk).exists():
             return True
+        if is_inbox:
+            if _can_manage_form_inboxes(user):
+                return True
+            return False
         from design_studio.permissions import get_role_group_names
         if collection.is_public and user.groups.filter(name__in=get_role_group_names("editorial")).exists():
             return True
-    if not write and collection.is_public:
+    if not write and not is_inbox and collection.is_public:
         return True
     return False
 
@@ -46,15 +51,22 @@ def _user_allowed_collections(user):
     if user.is_superuser:
         return Collection.objects.all()
     q = Q(owner=user) | Q(responsible_user=user) | Q(shared_with=user)
+    if _can_manage_form_inboxes(user):
+        q |= Q(template__content_type="form_inbox")
     from design_studio.permissions import get_role_group_names
     if user.groups.filter(name__in=get_role_group_names("editorial")).exists():
-        q |= Q(is_public=True)
+        q |= Q(is_public=True) & ~Q(template__content_type="form_inbox")
     return Collection.objects.filter(q).distinct()
 
 
 def _can_manage_collections(user) -> bool:
     from design_studio.permissions import user_has_role
     return user_has_role(user, "list_manage", allow_when_no_groups=True)
+
+
+def _can_manage_form_inboxes(user) -> bool:
+    from design_studio.permissions import user_has_role
+    return user_has_role(user, "form_inbox_manage", allow_when_no_groups=True)
 
 
 def _unique_collection_slug(base_slug: str) -> str:
@@ -90,7 +102,7 @@ def collection_list_view(request):
     npo_only_slugs = {"mitgliedsantrag", "kuendigung", "kurs-anmeldung"}
     from design_studio.permissions import is_npo_profile
     show_npo_templates = is_npo_profile()
-    if request.user.is_authenticated and (request.user.is_staff or can_manage):
+    if request.user.is_authenticated and (request.user.is_staff or _can_manage_form_inboxes(request.user)):
         for tpl in ListTemplate.objects.filter(content_type="form_inbox").order_by("name"):
             inboxes = inbox_by_tpl.get(tpl.id, [])
             if not inboxes and tpl.slug in npo_only_slugs and not show_npo_templates:

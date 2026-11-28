@@ -566,6 +566,39 @@ class ListKitTests(TestCase):
         self.assertFalse(tpl.custom_fields_json[1]["show_on_card"])
         self.assertEqual(tpl.custom_fields_json[1]["zone"], "body")
 
+    def test_pressewart_cannot_access_unassigned_form_inbox_collections(self):
+        from django.contrib.auth import get_user_model
+        from django.contrib.auth.models import Group
+
+        User = get_user_model()
+
+        g_presse, _ = Group.objects.get_or_create(name="Pressewart")
+        g_vorstand, _ = Group.objects.get_or_create(name="Leitung / Vorstand")
+        u_presse = User.objects.create_user(username="presse_list", password="pw")
+        u_presse.groups.add(g_presse)
+        u_vorstand = User.objects.create_user(username="vorstand_list", password="pw")
+        u_vorstand.groups.add(g_vorstand)
+
+        tpl_inbox = ListTemplate.objects.create(name="Mitgliedsantrag", slug="mitgliedsantrag-t", content_type="form_inbox")
+        col_inbox = Collection.objects.create(title="Mitgliedsantrag", slug="mitgliedsantrag-c", template=tpl_inbox, owner=self.staff, is_public=True)
+        tpl_news = ListTemplate.objects.create(name="News", slug="news-t", content_type="news")
+        col_news = Collection.objects.create(title="Aktuelles & News", slug="news-c", template=tpl_news, owner=self.staff, is_public=True)
+
+        # Pressewart sees public news, NOT form_inbox
+        self.client.force_login(u_presse)
+        r_list = self.client.get("/lists/")
+        self.assertEqual(r_list.status_code, 200)
+        self.assertContains(r_list, "Aktuelles &amp; News")
+        self.assertNotContains(r_list, "Mitgliedsantrag")
+        self.assertEqual(self.client.get(f"/lists/{col_inbox.id}/").status_code, 403)
+        self.assertEqual(self.client.get(f"/lists/{col_news.id}/").status_code, 200)
+
+        # Leitung / Vorstand sees form_inbox
+        self.client.force_login(u_vorstand)
+        r_vlist = self.client.get("/lists/")
+        self.assertContains(r_vlist, "Mitgliedsantrag")
+        self.assertEqual(self.client.get(f"/lists/{col_inbox.id}/").status_code, 200)
+
 
 if __name__ == "__main__":
     import unittest

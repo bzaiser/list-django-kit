@@ -19,6 +19,7 @@
 </div>
 
 <!-- Abschnitt 1: Formulare & Eingangslisten -->
+{% if form_cards or request.user.is_staff %}
 <section class="mb-5">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
         <div>
@@ -98,6 +99,7 @@
         {% endfor %}
     </div>
 </section>
+{% endif %}
 
 <!-- Abschnitt 2: Listen, News, Galerien & FAQs -->
 <section>
