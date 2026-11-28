@@ -1,5 +1,5 @@
 {% extends "design_studio/layouts/base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{{ collection.title }}{% endblock %}
 
@@ -109,7 +109,7 @@
                         <div class="d-flex gap-3 {% if ccfg.position == 'right' %}flex-row-reverse align-items-start{% elif ccfg.position == 'top' %}flex-column{% elif ccfg.position == 'bottom' %}flex-column-reverse{% else %}flex-row align-items-start{% endif %}">
                             <img src="{{ entry.cover_image.url }}" alt="{{ entry.title }}"
                                  class="object-fit-cover shadow-sm flex-shrink-0 {% if ccfg.shape == 'circle' %}rounded-circle{% elif ccfg.shape == 'square' %}rounded-0{% else %}rounded-3{% endif %}"
-                                 style="{% if ccfg.position == 'top' or ccfg.position == 'bottom' %}width:100%;max-height:{% if ccfg.size == 'sm' %}160px{% elif ccfg.size == 'lg' %}300px{% else %}220px{% endif %};{% else %}width:{% if ccfg.size == 'sm' %}84px{% elif ccfg.size == 'lg' %}180px{% else %}128px{% endif %};{% endif %}{% if ccfg.aspect == 'landscape' %}aspect-ratio:16/9;{% elif ccfg.aspect == 'portrait' %}aspect-ratio:3/4;{% elif ccfg.aspect == 'square' or ccfg.shape == 'circle' %}aspect-ratio:1/1;{% endif %}">
+                                 style="{% if ccfg.position == 'top' or ccfg.position == 'bottom' %}width:100%;max-height:{% if ccfg.size == 'xs' %}110px{% elif ccfg.size == 'sm' %}160px{% elif ccfg.size == 'lg' %}300px{% elif ccfg.size == 'xl' %}380px{% else %}220px{% endif %};{% else %}width:{% if ccfg.size == 'xs' %}56px{% elif ccfg.size == 'sm' %}84px{% elif ccfg.size == 'lg' %}180px{% elif ccfg.size == 'xl' %}240px{% else %}128px{% endif %};{% endif %}{% if ccfg.aspect == 'landscape' %}aspect-ratio:16/9;{% elif ccfg.aspect == 'portrait' %}aspect-ratio:3/4;{% elif ccfg.aspect == 'square' or ccfg.shape == 'circle' %}aspect-ratio:1/1;{% endif %}">
                             <div class="flex-grow-1 min-w-0">
                         {% endwith %}
                         {% endif %}
@@ -786,6 +786,9 @@
         }
     });
 })();
+</script>
+<script src="{% static 'design_studio/vendor/sortable/Sortable.min.js' %}"></script>
+<script>
 (function () {
     const sortSel = document.getElementById('lk-sort-select');
     if (sortSel) {

@@ -218,9 +218,11 @@
                         <div class="col-6">
                             <label class="form-label mb-1">Größe</label>
                             <select name="ui_cover_size" id="lk-cover-size" class="form-select form-select-sm">
-                                <option value="sm" {% if ui_style.cover_image.size == 'sm' %}selected{% endif %}>Klein</option>
-                                <option value="md" {% if ui_style.cover_image.size == 'md' or not ui_style.cover_image %}selected{% endif %}>Mittel</option>
-                                <option value="lg" {% if ui_style.cover_image.size == 'lg' %}selected{% endif %}>Groß</option>
+                                <option value="xs" {% if ui_style.cover_image.size == 'xs' %}selected{% endif %}>Sehr klein (56 px)</option>
+                                <option value="sm" {% if ui_style.cover_image.size == 'sm' %}selected{% endif %}>Klein (84 px)</option>
+                                <option value="md" {% if ui_style.cover_image.size == 'md' or not ui_style.cover_image %}selected{% endif %}>Mittel (128 px)</option>
+                                <option value="lg" {% if ui_style.cover_image.size == 'lg' %}selected{% endif %}>Groß (180 px)</option>
+                                <option value="xl" {% if ui_style.cover_image.size == 'xl' %}selected{% endif %}>Sehr groß (240 px)</option>
                             </select>
                         </div>
                     </div>
